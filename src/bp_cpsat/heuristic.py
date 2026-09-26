@@ -1,4 +1,8 @@
-"""Constructive greedy packing used for the upper bound and solution hints."""
+"""Constructive greedy packing used for the upper bound and solution hints.
+
+Points are explored bottom-back-left: lowest ``z`` first, then smallest ``y``,
+then smallest ``x``.
+"""
 
 from __future__ import annotations
 
@@ -52,7 +56,11 @@ def _first_position(
     points: Iterable[Point],
     orientations: Sequence[Orientation],
 ) -> tuple[Point, Orientation] | None:
-    """Bottom-left-back first fit over candidate points and orientations."""
+    """Bottom-back-left first fit over candidate points and orientations.
+
+    Points are tried in ``(z, y, x)`` order, i.e. lowest stack first, then
+    nearest the back wall, then nearest the left wall.
+    """
     for x, y, z in sorted(points, key=lambda point: (point[2], point[1], point[0])):
         if x >= bin_capacity.width:
             continue
@@ -95,7 +103,7 @@ def greedy_pack(
     order: ItemOrder = ItemOrder.VOLUME,
     max_bins: int | None = None,
 ) -> PackingSolution | None:
-    """Pack items with a bottom-left-back first-fit heuristic.
+    """Pack items with a bottom-back-left first-fit heuristic.
 
     Returns ``None`` when the packing would need more than ``max_bins`` bins.
     """

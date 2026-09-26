@@ -121,7 +121,14 @@ class Placement:
 
 @dataclass(frozen=True, slots=True)
 class PackingSolution:
-    """A complete packing: every item appears exactly once."""
+    """A complete packing: every item appears exactly once.
+
+    ``optimal`` is ``True`` only when ``bin_count`` was proven minimal. It is
+    ``False`` when the search stopped on a search limit before ruling out a
+    smaller bin count, in which case ``bin_count`` is a valid packing whose
+    minimality is unknown.
+    """
 
     bin_count: int
     placements: tuple[Placement, ...]
+    optimal: bool = True

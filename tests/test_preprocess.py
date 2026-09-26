@@ -80,16 +80,16 @@ def test_build_pair_compatibility_is_order_independent_for_separability() -> Non
 
 def test_incompatible_clique_lower_bound() -> None:
     items = [Item(f"i{k}", 6, 6, 6) for k in range(3)]
-    prepared_items = _prepared(items).items
-    assert volume_lower_bound(prepared_items, BIN) == 1
-    assert incompatibility_clique_lower_bound(prepared_items, BIN) == 3
-    assert _prepared(items).lower_bound == 3
+    prepared = _prepared(items)
+    assert volume_lower_bound(prepared.items, BIN) == 1
+    assert incompatibility_clique_lower_bound(prepared.pairs, len(prepared.items)) == 3
+    assert prepared.lower_bound == 3
 
 
 def test_clique_lower_bound_is_one_when_all_items_fit_together() -> None:
     items = [Item(f"i{k}", 2, 2, 2) for k in range(5)]
-    prepared_items = _prepared(items).items
-    assert incompatibility_clique_lower_bound(prepared_items, BIN) == 1
+    prepared = _prepared(items)
+    assert incompatibility_clique_lower_bound(prepared.pairs, len(prepared.items)) == 1
 
 
 def test_prepare_orders_items_by_decreasing_volume_then_id() -> None:

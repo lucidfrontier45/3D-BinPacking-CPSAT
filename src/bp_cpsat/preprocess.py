@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from .models import Bin, Item, Orientation, PackingSolution, Placement
@@ -132,21 +132,26 @@ def _greedy_clique(adjacency: tuple[frozenset[int], ...]) -> int:
 
 
 def incompatibility_clique_lower_bound(
-    items: Sequence[PreparedItem], bin_capacity: Bin
+    pairs: Mapping[tuple[int, int], PairCompatibility],
+    item_count: int,
 ) -> int:
-    """Size of a greedy clique in the pairwise incompatibility graph."""
-    count = len(items)
-    if count == 0:
+    """Size of a greedy clique in the pairwise incompatibility graph.
+
+    Reads the precomputed ``pairs`` mapping, so callers that already built the
+    pairwise data do not pay for it twice. ``item_count`` sizes the graph; a
+    single item is vacuously a clique, so any non-empty instance contributes a
+    lower bound of at least one bin.
+    """
+    if item_count == 0:
         return 0
-    adjacency: list[set[int]] = [set() for _ in range(count)]
-    for i in range(count):
-        for j in range(i + 1, count):
-            if not build_pair_compatibility(
-                items[i], items[j], bin_capacity
-            ).coexistence_possible:
-                adjacency[i].add(j)
-                adjacency[j].add(i)
-    return _greedy_clique(tuple(frozenset(neighbors) for neighbors in adjacency))
+    adjacency: dict[int, set[int]] = {}
+    for (i, j), compatibility in pairs.items():
+        if not compatibility.coexistence_possible:
+            adjacency.setdefault(i, set()).add(j)
+            adjacency.setdefault(j, set()).add(i)
+    empty = frozenset[int]()
+    dense = tuple(frozenset(adjacency.get(node, empty)) for node in range(item_count))
+    return _greedy_clique(dense)
 
 
 def prepare(
@@ -186,9 +191,7 @@ def prepare(
         pairs=pairs,
         total_volume=sum(prepared.volume for prepared in items_tuple),
         volume_lower_bound=volume_lower_bound(items_tuple, bin_capacity),
-        clique_lower_bound=incompatibility_clique_lower_bound(
-            items_tuple, bin_capacity
-        ),
+        clique_lower_bound=incompatibility_clique_lower_bound(pairs, len(items_tuple)),
         upper_bound=greedy.bin_count,
         greedy_placements=greedy.placements,
     )

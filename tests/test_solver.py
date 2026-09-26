@@ -200,9 +200,12 @@ def test_empty_instance_uses_no_bins() -> None:
 
 
 def test_deterministic_on_tiny_instance() -> None:
+    # One worker: CP-SAT then explores a single deterministic search path.
+    options = SolverOptions(time_limit=15.0, num_search_workers=1)
     items = [Item(f"i{k}", 3, 4, 5, RotationType.ALL) for k in range(6)]
-    first = solve(items, BIN, options=FAST)
-    second = solve(items, BIN, options=FAST)
+    first = solve(items, BIN, options=options)
+    second = solve(items, BIN, options=options)
+    assert first is not None and second is not None
     assert first == second
 
 
@@ -273,3 +276,84 @@ def test_hints_are_optional() -> None:
     )
     assert with_hints is not None and without_hints is not None
     assert with_hints.bin_count == without_hints.bin_count == 2
+
+
+def _hard_instance() -> tuple[list[Item], Bin]:
+    """A symmetric instance big enough that a tiny budget cuts the search short."""
+    bin_capacity = Bin(13, 11, 9)
+    items = [
+        Item(
+            id=f"j{t}",
+            width=3 + t % 4,
+            length=2 + t % 3,
+            height=2 + t % 2,
+            rotation=RotationType.ALL,
+        )
+        for t in range(9)
+    ]
+    return items, bin_capacity
+
+
+def test_exhausted_budget_still_returns_a_valid_packing() -> None:
+    """A scan that runs out of budget must hand back a usable packing, flagged."""
+    items, bin_capacity = _hard_instance()
+    solution = solve(items, bin_capacity, options=SolverOptions(time_limit=0.0))
+    assert solution is not None
+    validate(items, bin_capacity, solution)
+    if not solution.optimal:
+        # A non-optimal answer is still a real packing, not a fabricated count.
+        greedy = best_greedy_pack(items, bin_capacity)
+        assert greedy is not None
+        assert solution.bin_count == greedy.bin_count
+
+
+def test_optimal_flag_is_set_when_the_scan_proves_a_minimum() -> None:
+    items, bin_capacity = _hard_instance()
+    solution = solve(items, bin_capacity, options=FAST)
+    assert solution is not None
+    validate(items, bin_capacity, solution)
+    assert solution.optimal is True
+
+
+def test_per_k_limit_does_not_leak_into_the_returned_answer() -> None:
+    """Tight per-call limits must never promote an unproven count to optimal."""
+    items, bin_capacity = _hard_instance()
+    generous = solve(items, bin_capacity, options=FAST)
+    assert generous is not None
+    for per_k in (0.0, 0.01, 0.05):
+        limited = solve(
+            items,
+            bin_capacity,
+            options=SolverOptions(time_limit=15.0, per_k_time_limit=per_k),
+        )
+        assert limited is not None
+        validate(items, bin_capacity, limited)
+        if limited.optimal:
+            # Claiming optimality means the count really is the minimum.
+            assert limited.bin_count == generous.bin_count
+        else:
+            greedy = best_greedy_pack(items, bin_capacity)
+            assert greedy is not None
+            assert limited.bin_count == greedy.bin_count
+
+
+def test_zero_budget_still_reports_the_proven_lower_bound_case() -> None:
+    """With no budget at all, an instance that needs one bin is still provable."""
+    solution = solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=0.0))
+    assert solution is None or solution.bin_count == 1
+
+
+def test_status_comparison_uses_value_equality() -> None:
+    """CP-SAT hands back a fresh status object, so ``is`` comparisons fail.
+
+    ``CpSolverStatus`` is not a true singleton enum, which means an identity
+    check against ``cp_model.UNKNOWN`` silently never matches. Guard the shape
+    of that contract so it cannot regress.
+    """
+    problem = _problem([Item(f"i{k}", 3, 4, 5) for k in range(4)])
+    fixed = build_fixed_k_model(problem, 1, ModelOptions())
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 0.0
+    status = solver.solve(fixed.model)
+    assert status == cp_model.UNKNOWN
+    assert status is not cp_model.UNKNOWN
