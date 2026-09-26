@@ -34,6 +34,13 @@ class SolverOptions:
     model: ModelOptions = field(default_factory=ModelOptions)
     per_k_time_limit: float | None = None
 
+    def __post_init__(self) -> None:
+        for name in ("time_limit", "per_k_time_limit"):
+            value = getattr(self, name)
+            if value is not None and value < 0:
+                msg = f"{name} must be non-negative or None, got {value}"
+                raise ValueError(msg)
+
 
 def build_hints(problem: PreparedProblem) -> tuple[Hint | None, ...]:
     """Turn the greedy packing into per-item hints in canonical item order.
@@ -126,7 +133,6 @@ def solve(
         return None
 
     hints = build_hints(problem) if opts.use_hints else (None,) * problem.item_count
-    hints_used = len(hints) == problem.item_count
     deadline = None if opts.time_limit is None else perf_counter() + opts.time_limit
     exhausted = False
 
@@ -159,12 +165,14 @@ def solve(
             # count has been ruled out. Anything found from here on would be an
             # upper bound only, so stop and hand back the best packing we have.
             return _with_optimality(greedy, optimal=False)
-        if status == cp_model.INFEASIBLE and k == problem.upper_bound and hints_used:
+        if status == cp_model.INFEASIBLE and k == problem.upper_bound:
             # The greedy packing already assigned every item to at most ``UB``
             # bins, so the ``UB``-bin model is feasible by construction. A very
             # small budget can make CP-SAT answer before it performs that
             # feasibility check, in which case ``INFEASIBLE`` is a search
-            # artifact rather than a proof, and must not be trusted.
+            # artifact rather than a proof, and must not be trusted. This holds
+            # regardless of ``use_hints``: the invariant is about the greedy
+            # packing, not about whether it was handed to the solver.
             return _with_optimality(greedy, optimal=False)
     if exhausted:
         return _with_optimality(greedy, optimal=False)

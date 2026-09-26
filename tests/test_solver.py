@@ -1,6 +1,7 @@
 """End-to-end tests: feasibility, rotation policies and minimum bin count."""
 
 import itertools
+from random import Random
 
 import pytest
 from ortools.sat.python import cp_model
@@ -15,6 +16,7 @@ from bp_cpsat import (
     SolverOptions,
     best_greedy_pack,
     build_fixed_k_model,
+    build_hints,
     prepare,
     solve,
     validate,
@@ -381,3 +383,88 @@ def test_status_comparison_uses_value_equality() -> None:
     status = solver.solve(fixed.model)
     assert status == cp_model.UNKNOWN
     assert status is not cp_model.UNKNOWN
+
+
+def test_hints_are_never_partial() -> None:
+    """``build_hints`` must return a complete assignment for every item.
+
+    Greedy draws its orientations from ``allowed_orientations``, so every
+    placement is always found and its orientation is always in the prepared
+    set. That is what makes the ``k == UB`` infeasibility guard sound, and it
+    is why nothing downstream has to test for partial hints.
+    """
+    rng = Random(11)
+    for _ in range(60):
+        bin_capacity = Bin(
+            width=rng.randint(2, 8),
+            length=rng.randint(2, 8),
+            height=rng.randint(2, 8),
+        )
+        items = [
+            Item(
+                id=f"i{t}",
+                width=rng.randint(1, bin_capacity.width),
+                length=rng.randint(1, bin_capacity.length),
+                height=rng.randint(1, bin_capacity.height),
+                rotation=rng.choice(list(RotationType)),
+            )
+            for t in range(rng.randint(1, 5))
+        ]
+        greedy = best_greedy_pack(items, bin_capacity)
+        if greedy is None:
+            continue
+        problem = prepare(items, bin_capacity, greedy)
+        hints = build_hints(problem)
+        assert len(hints) == problem.item_count
+        assert all(hint is not None for hint in hints)
+        # Restricted-growth numbering, as the symmetry-breaking constraints
+        # require: bin_0 == 0 and bin_i <= 1 + max(bin_0 .. bin_{i-1}).
+        # The sequence is not sorted, only bounded that way.
+        indices = [hint.bin_index for hint in hints if hint is not None]
+        assert indices[0] == 0
+        for i in range(1, len(indices)):
+            assert indices[i] <= max(indices[:i]) + 1
+
+
+@pytest.mark.parametrize(
+    ("time_limit", "per_k_time_limit"),
+    [
+        (-1.0, None),
+        (-0.001, None),
+        (None, -1.0),
+        (None, -5.0),
+        (-1.0, -2.0),
+    ],
+)
+def test_negative_time_limits_are_rejected(
+    time_limit: float | None, per_k_time_limit: float | None
+) -> None:
+    """CP-SAT returns ``MODEL_INVALID`` for a negative budget.
+
+    Without this check ``solve`` surfaced that as a confusing "CP-SAT
+    rejected the generated model", which blamed the model rather than the
+    caller's argument.
+    """
+    with pytest.raises(ValueError, match="non-negative"):
+        SolverOptions(time_limit=time_limit, per_k_time_limit=per_k_time_limit)
+
+
+@pytest.mark.parametrize(
+    ("time_limit", "per_k_time_limit"),
+    [
+        (0.0, None),
+        (None, None),
+        (10.0, 0.0),
+        (10.0, None),
+        (0.0, 0.0),
+    ],
+)
+def test_zero_and_unbounded_time_limits_are_accepted(
+    time_limit: float | None, per_k_time_limit: float | None
+) -> None:
+    """Zero means 'no budget' and None means 'unbounded'; neither is invalid."""
+    options = SolverOptions(time_limit=time_limit, per_k_time_limit=per_k_time_limit)
+    items = [Item(f"i{k}", 2, 2, 2) for k in range(3)]
+    solution = solve(items, Bin(5, 5, 5), options=options)
+    assert solution is not None
+    validate(items, Bin(5, 5, 5), solution)
