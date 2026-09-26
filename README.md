@@ -70,6 +70,17 @@ greedy packing, with `N` as the theoretical fallback.
 fixed-K call, so total runtime does not grow with the width of the range. Use
 `per_k_time_limit` to additionally cap each individual feasibility call.
 
+`ModelOptions` exposes the strengthening constraints individually for
+benchmarking. None of them change which packings are feasible, only how hard
+they are to propagate. `full_reification` is off by default: it adds a
+constraint per axis and direction per pair and measured consistently slower
+than the default half reification, so it is kept switchable for reproducibility
+rather than recommended.
+
+Per-axis `Cumulative` relaxations and `NoOverlap2D` / `NoOverlap` global
+constraints for axis-impossible subsets are not implemented yet; they remain
+open items from #1.
+
 With the default parallel search, equally optimal packings may differ between
 runs. Set `SolverOptions(num_search_workers=1)` for bit-identical results.
 

@@ -105,11 +105,12 @@ class PreparedProblem:
 
 
 def volume_lower_bound(items: Sequence[PreparedItem], bin_capacity: Bin) -> int:
-    """``ceil(total item volume / bin volume)``."""
-    total = sum(prepared.volume for prepared in items)
-    if total == 0:
-        return 0
-    return -(-total // bin_capacity.volume)
+    """``ceil(total item volume / bin volume)``.
+
+    Every item has strictly positive dimensions, so the total is positive for
+    any non-empty instance and an empty one cannot reach here.
+    """
+    return -(-sum(prepared.volume for prepared in items) // bin_capacity.volume)
 
 
 def _greedy_clique(adjacency: tuple[frozenset[int], ...]) -> int:

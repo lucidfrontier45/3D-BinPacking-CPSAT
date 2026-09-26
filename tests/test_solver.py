@@ -266,6 +266,30 @@ def test_model_options_agree_on_the_optimum(
     validate(items, BIN, solution)
 
 
+def test_full_reification_adds_exactly_one_constraint_per_separation() -> None:
+    """Pin the cost claimed in the ``ModelOptions`` docstring.
+
+    ``full_reification`` posts the converse of every separation literal, so it
+    must add exactly ``2 * pairs * separable_axes`` constraints. The docstring
+    quotes this number as justification for leaving the flag off.
+    """
+    items = [Item(f"i{t}", 3 + t, 3, 4, RotationType.ALL) for t in range(4)]
+    problem = _problem(items, Bin(10, 10, 10))
+
+    def constraint_count(options: ModelOptions) -> int:
+        model = build_fixed_k_model(problem, 2, options).model
+        return len(model.Proto().constraints)
+
+    without = constraint_count(ModelOptions(full_reification=False))
+    with_flag = constraint_count(ModelOptions(full_reification=True))
+
+    axes = 0
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            axes += sum(problem.pair(i, j).separable)
+    assert with_flag - without == 2 * axes
+
+
 def test_hints_are_optional() -> None:
     items = [Item(f"i{k}", 5, 5, 5) for k in range(16)]
     with_hints = solve(

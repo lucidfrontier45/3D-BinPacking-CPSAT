@@ -1,4 +1,18 @@
-"""Fixed-K CP-SAT model builder for the 3D bin-packing feasibility problem."""
+"""Fixed-K CP-SAT model builder for the 3D bin-packing feasibility problem.
+
+Non-overlap is encoded with half-reified Booleans and an enforced
+``bool_or``, never with Big-M.
+
+Not yet implemented, tracked as later stages of issue #1 and out of scope here:
+
+* ``Cumulative`` relaxations per axis. Both the interval sizes and the
+  cross-sectional demands vary with the chosen orientation, so this wants
+  orientation-indexed precomputed values rather than new multiplication
+  constraints.
+* ``NoOverlap2D`` / ``NoOverlap`` on pairs that preprocessing proved cannot
+  separate on one or two axes. Cheap, but it should start from greedy or
+  maximal cliques instead of enumerating every maximal clique.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +27,33 @@ from .preprocess import PairCompatibility, PreparedProblem
 
 @dataclass(frozen=True, slots=True)
 class ModelOptions:
-    """Internal switches for strengthening constraints, for benchmarking."""
+    """Internal switches for strengthening constraints, for benchmarking.
+
+    Every field leaves the set of feasible packings unchanged; they only affect
+    which constraints are posted and how hard they are to propagate.
+
+    ``symmetry_breaking``
+        Force used bin indices to be consecutive from zero (restricted-growth
+        numbering). This is a pure symmetry cut and is on by default.
+    ``opposite_direction_at_most_one``
+        Forbid ``x_ij`` and ``x_ji`` from both holding. They are mutually
+        exclusive whenever both items are inside the bin, so this is implied by
+        the boundary constraints and costs nothing to keep explicit.
+    ``orientation_compatibility``
+        Tabulate, per item pair, which orientation combinations may share a
+        bin. Prunes assignments the axis literals could not rule out on their
+        own, and is on by default.
+    ``full_reification``
+        Also enforce the converse of each separation literal, pinning literals
+        to the truth of their inequalities. **Benchmarked and not recommended:**
+        it adds a constraint per axis and direction per pair (36 extra
+        constraints on a 4-item, 3-axis instance) and measured consistently
+        slower than the default across a 12-instance sweep, slower on 11 of 12
+        and never faster. The default half reification leaves the solver free
+        to pick whichever separating literal is cheapest, which CP-SAT's
+        automatic ``bool_or`` relaxation handles well. Kept switchable so the
+        claim stays reproducible.
+    """
 
     symmetry_breaking: bool = True
     opposite_direction_at_most_one: bool = True
