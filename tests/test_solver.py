@@ -6,6 +6,8 @@ from random import Random
 import pytest
 from ortools.sat.python import cp_model
 
+from bp_cpsat import solver as solver_module
+
 from bp_cpsat import (
     Bin,
     Item,
@@ -383,6 +385,51 @@ def test_status_comparison_uses_value_equality() -> None:
     status = solver.solve(fixed.model)
     assert status == cp_model.UNKNOWN
     assert status is not cp_model.UNKNOWN
+
+
+def test_unknown_fallback_is_verified(monkeypatch: pytest.MonkeyPatch) -> None:
+    validation_calls: list[bool] = []
+
+    class UnknownSolver:
+        def solve(self, model: cp_model.CpModel) -> cp_model.CpSolverStatus:
+            return cp_model.UNKNOWN
+
+    monkeypatch.setattr(
+        solver_module, "_make_solver", lambda options, time_limit: UnknownSolver()
+    )
+    monkeypatch.setattr(
+        solver_module,
+        "validate",
+        lambda items, bin_capacity, solution: validation_calls.append(True),
+    )
+    solution = solve(
+        [Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None)
+    )
+    assert solution is not None
+    assert solution.optimal is False
+    assert validation_calls == [True]
+
+
+def test_infeasible_greedy_upper_bound_is_verified_then_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    validation_calls: list[bool] = []
+
+    class InfeasibleSolver:
+        def solve(self, model: cp_model.CpModel) -> cp_model.CpSolverStatus:
+            return cp_model.INFEASIBLE
+
+    monkeypatch.setattr(
+        solver_module, "_make_solver", lambda options, time_limit: InfeasibleSolver()
+    )
+    monkeypatch.setattr(
+        solver_module,
+        "validate",
+        lambda items, bin_capacity, solution: validation_calls.append(True),
+    )
+    with pytest.raises(RuntimeError, match="greedy upper-bound model infeasible"):
+        solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None))
+    assert validation_calls == [True]
 
 
 def test_hints_are_never_partial() -> None:

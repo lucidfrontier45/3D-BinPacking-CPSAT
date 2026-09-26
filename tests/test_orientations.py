@@ -1,5 +1,9 @@
 """Orientation generation, deduplication and fit filtering."""
 
+from typing import cast
+
+import pytest
+
 from bp_cpsat import Bin, Item, RotationType, allowed_orientations
 from bp_cpsat.orientations import candidate_orientations
 
@@ -11,6 +15,22 @@ def test_none_produces_exactly_one_orientation() -> None:
     orientations = allowed_orientations(item, BIN)
     assert len(orientations) == 1
     assert orientations[0].as_tuple() == (3, 4, 5)
+
+
+@pytest.mark.parametrize("rotation", ["none", "fixed_bottom", "all"])
+def test_string_rotation_policy_is_coerced_to_enum(rotation: str) -> None:
+    item = Item("a", 3, 4, 5, cast(RotationType, rotation))
+    assert item.rotation is RotationType(rotation)
+    assert len(candidate_orientations(item)) == {
+        "none": 1,
+        "fixed_bottom": 2,
+        "all": 6,
+    }[rotation]
+
+
+def test_invalid_rotation_policy_is_rejected() -> None:
+    with pytest.raises(ValueError, match="rotation must be one of"):
+        Item("a", 3, 4, 5, cast(RotationType, "invalid"))
 
 
 def test_fixed_bottom_only_swaps_width_and_length() -> None:

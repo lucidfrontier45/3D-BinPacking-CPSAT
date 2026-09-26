@@ -164,17 +164,22 @@ def solve(
             # This ``K`` is neither feasible nor refuted, so no smaller bin
             # count has been ruled out. Anything found from here on would be an
             # upper bound only, so stop and hand back the best packing we have.
+            if opts.verify:
+                validate(items, bin_capacity, greedy)
             return _with_optimality(greedy, optimal=False)
         if status == cp_model.INFEASIBLE and k == problem.upper_bound:
             # The greedy packing already assigned every item to at most ``UB``
-            # bins, so the ``UB``-bin model is feasible by construction. A very
-            # small budget can make CP-SAT answer before it performs that
-            # feasibility check, in which case ``INFEASIBLE`` is a search
-            # artifact rather than a proof, and must not be trusted. This holds
-            # regardless of ``use_hints``: the invariant is about the greedy
-            # packing, not about whether it was handed to the solver.
-            return _with_optimality(greedy, optimal=False)
+            # bins, so the ``UB``-bin model is feasible by construction. A
+            # proven infeasibility here contradicts that invariant and points
+            # to a model/heuristic inconsistency; validate the incumbent before
+            # surfacing the contradiction.
+            if opts.verify:
+                validate(items, bin_capacity, greedy)
+            msg = "CP-SAT proved the greedy upper-bound model infeasible"
+            raise RuntimeError(msg)
     if exhausted:
+        if opts.verify:
+            validate(items, bin_capacity, greedy)
         return _with_optimality(greedy, optimal=False)
     # Every remaining ``K`` was proven infeasible, so the instance is.
     return None

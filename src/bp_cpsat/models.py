@@ -41,6 +41,13 @@ class Item:
         if not self.id:
             msg = "item id must be non-empty"
             raise ValueError(msg)
+        try:
+            rotation = RotationType(self.rotation)
+        except (TypeError, ValueError) as error:
+            choices = [policy.value for policy in RotationType]
+            msg = f"rotation must be one of {choices}, got {self.rotation!r}"
+            raise ValueError(msg) from error
+        object.__setattr__(self, "rotation", rotation)
 
     @property
     def volume(self) -> int:
@@ -131,4 +138,4 @@ class PackingSolution:
 
     bin_count: int
     placements: tuple[Placement, ...]
-    optimal: bool = True
+    optimal: bool = False

@@ -108,7 +108,7 @@ def greedy_pack(
     Returns ``None`` when the packing would need more than ``max_bins`` bins.
     """
     if not items:
-        return PackingSolution(bin_count=0, placements=())
+        return PackingSolution(bin_count=0, placements=(), optimal=True)
 
     bin_points: list[set[Point]] = []
     bin_placements: list[list[Placement]] = []
@@ -154,7 +154,9 @@ def greedy_pack(
         _extend_points(bin_capacity, bin_points[index], (x, y, z), orientation)
 
     placements = tuple(placement for group in bin_placements for placement in group)
-    return PackingSolution(bin_count=len(bin_placements), placements=placements)
+    return PackingSolution(
+        bin_count=len(bin_placements), placements=placements, optimal=False
+    )
 
 
 def best_greedy_pack(

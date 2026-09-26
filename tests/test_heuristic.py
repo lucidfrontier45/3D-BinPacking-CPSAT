@@ -25,6 +25,19 @@ def test_greedy_handles_empty_instance() -> None:
     assert solution is not None
     assert solution.bin_count == 0
     assert solution.placements == ()
+    assert solution.optimal is True
+
+
+def test_non_empty_greedy_solution_does_not_claim_optimality() -> None:
+    solution = greedy_pack([Item("a", 4, 5, 6)], BIN)
+    assert solution is not None
+    assert solution.optimal is False
+
+
+def test_best_greedy_solution_does_not_claim_optimality() -> None:
+    solution = best_greedy_pack([Item("a", 4, 5, 6)], BIN)
+    assert solution is not None
+    assert solution.optimal is False
 
 
 def test_greedy_respects_max_bins() -> None:
