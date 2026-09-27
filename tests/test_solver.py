@@ -418,6 +418,33 @@ def test_infeasible_greedy_upper_bound_is_verified_then_raises(
     assert validation_calls == [True]
 
 
+def test_unhandled_status_raises_instead_of_reporting_infeasible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A status the dispatch does not know must fail loudly, not fall through.
+
+    ``solve`` returns ``None`` only when *every* scanned ``K`` was refuted. An
+    unrecognised status slipping past the dispatch used to complete the scan and
+    report a feasible instance as proven infeasible, so the catch-all arm raises.
+    """
+
+    class FutureStatus:
+        """Stand-in for a ``CpSolverStatus`` value this build does not know."""
+
+        def __repr__(self) -> str:
+            return "<CpSolverStatus.FUTURE: 99>"
+
+    class FutureSolver:
+        def solve(self, model: cp_model.CpModel) -> FutureStatus:
+            return FutureStatus()
+
+    monkeypatch.setattr(solver_module, "_make_solver", lambda options, time_limit: FutureSolver())
+    # Three 2x2x2 boxes pack into one 4x4x4 bin, so this instance is feasible.
+    items = [Item("a", Shape(2, 2, 2)), Item("b", Shape(2, 2, 2)), Item("c", Shape(2, 2, 2))]
+    with pytest.raises(RuntimeError, match="unhandled status"):
+        solve(items, Bin(4, 4, 4), options=SolverOptions(time_limit=5.0, verify=False))
+
+
 def test_hints_are_never_partial() -> None:
     """``build_hints`` must return a complete assignment for every item.
 

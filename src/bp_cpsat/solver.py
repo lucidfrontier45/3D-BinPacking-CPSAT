@@ -154,31 +154,42 @@ def solve(
         fixed = build_fixed_k_model(problem, k, opts.model)
         fixed.add_hints(hints)
         status = solver.solve(fixed.model)
-        if status == cp_model.MODEL_INVALID:
-            msg = "CP-SAT rejected the generated model"
-            raise RuntimeError(msg)
-        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-            solution = fixed.extract(solver, problem)
-            if opts.verify:
-                validate(items, bin_capacity, solution)
-            return _with_optimality(solution, optimal=True)
-        if status == cp_model.UNKNOWN:
-            # This ``K`` is neither feasible nor refuted, so no smaller bin
-            # count has been ruled out. Anything found from here on would be an
-            # upper bound only, so stop and hand back the best packing we have.
-            if opts.verify:
-                validate(items, bin_capacity, greedy)
-            return _with_optimality(greedy, optimal=False)
-        if status == cp_model.INFEASIBLE and k == problem.upper_bound:
-            # The greedy packing already assigned every item to at most ``UB``
-            # bins, so the ``UB``-bin model is feasible by construction. A
-            # proven infeasibility here contradicts that invariant and points
-            # to a model/heuristic inconsistency; validate the incumbent before
-            # surfacing the contradiction.
-            if opts.verify:
-                validate(items, bin_capacity, greedy)
-            msg = "CP-SAT proved the greedy upper-bound model infeasible"
-            raise RuntimeError(msg)
+        # ``match`` compares by value, not identity, which matters here: CP-SAT
+        # returns a fresh status object rather than the enum member itself.
+        match status:
+            case cp_model.MODEL_INVALID:
+                msg = "CP-SAT rejected the generated model"
+                raise RuntimeError(msg)
+            case cp_model.OPTIMAL | cp_model.FEASIBLE:
+                solution = fixed.extract(solver, problem)
+                if opts.verify:
+                    validate(items, bin_capacity, solution)
+                return _with_optimality(solution, optimal=True)
+            case cp_model.UNKNOWN:
+                # This ``K`` is neither feasible nor refuted, so no smaller bin
+                # count has been ruled out. Anything found from here on would be
+                # an upper bound only, so stop and hand back the best packing.
+                if opts.verify:
+                    validate(items, bin_capacity, greedy)
+                return _with_optimality(greedy, optimal=False)
+            case cp_model.INFEASIBLE:
+                if k == problem.upper_bound:
+                    # The greedy packing already assigned every item to at most
+                    # ``UB`` bins, so the ``UB``-bin model is feasible by
+                    # construction. A proven infeasibility here contradicts that
+                    # invariant and points to a model/heuristic inconsistency;
+                    # validate the incumbent before surfacing the contradiction.
+                    if opts.verify:
+                        validate(items, bin_capacity, greedy)
+                    msg = "CP-SAT proved the greedy upper-bound model infeasible"
+                    raise RuntimeError(msg)
+                # Otherwise this ``K`` is refuted, so the scan moves on to the
+                # next one; every ``K`` refuted implies the instance is too.
+            case _:
+                # An unrecognised status must never fall through to the
+                # ``return None`` below, which means *proven infeasible*.
+                msg = f"CP-SAT returned an unhandled status {status!r} at K={k}"
+                raise RuntimeError(msg)
     if exhausted:
         if opts.verify:
             validate(items, bin_capacity, greedy)
