@@ -15,7 +15,7 @@ Run `uv run poe check` and `uv run poe lint` before finishing any task of Python
 
 ## Layout
 
-- `src/3dbp_cpsat/` — source
+- `src/bp_cpsat/` — source
 - `tests/` — tests
 - `pyproject.toml` — config, deps, poe tasks
 - `uv.lock` — locked deps
