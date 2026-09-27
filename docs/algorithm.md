@@ -19,35 +19,31 @@ The implementation uses Google OR-Tools CP-SAT. The geometric non-overlap model 
 
 Let the bin dimensions be
 
-[
+$$
 (W, L, H).
-]
+$$
 
-For each item (i), the original dimensions are
+For each item $i$, the original dimensions are
 
-[
+$$
 (w_i, l_i, h_i).
-]
+$$
 
 A placement consists of:
 
-- a bin index (b_i),
-- an integer origin ((x_i,y_i,z_i)),
-- an allowed orientation with effective dimensions
-
-[
-(d_i^x,d_i^y,d_i^z).
-]
+- a bin index $b_i$,
+- an integer origin $(x_i,y_i,z_i)$,
+- an allowed orientation with effective dimensions $(d_i^x,d_i^y,d_i^z)$.
 
 A solution is feasible if every item is inside its assigned bin and no two items assigned to the same bin overlap in all three axes.
 
 The optimization objective is
 
-[
-min K,
-]
+$$
+\min K,
+$$
 
-where (K) is the number of bins used.
+where $K$ is the number of bins used.
 
 ---
 
@@ -55,57 +51,57 @@ where (K) is the number of bins used.
 
 Each item has one of three rotation policies.
 
-### `none`
+### \`none\`
 
 No rotation is allowed:
 
-[
-O_i = {(w_i,l_i,h_i)}.
-]
+$$
+O_i = \{(w_i,l_i,h_i)\}.
+$$
 
-### `fixed_bottom`
+### \`fixed_bottom\`
 
 The vertical axis is fixed and only a 90-degree rotation in the base plane is allowed:
 
-[
+$$
 O_i =
-{
+\{
 (w_i,l_i,h_i),
 (l_i,w_i,h_i)
-}.
-]
+\}.
+$$
 
-This does **not** mean the item must lie on the floor of the bin. It may still be stacked at (z_i > 0).
+This does **not** mean the item must lie on the floor of the bin. It may still be stacked at $z_i > 0$.
 
-### `all`
+### \`all\`
 
 All six axis-aligned permutations are allowed:
 
-[
+$$
 O_i =
-{
+\{
 (w_i,l_i,h_i),
 (w_i,h_i,l_i),
 (l_i,w_i,h_i),
 (l_i,h_i,w_i),
 (h_i,w_i,l_i),
 (h_i,l_i,w_i)
-}.
-]
+\}.
+$$
 
 Duplicate orientations are removed when two or more dimensions are equal.
 
 Before model construction, orientations that cannot fit in a single bin are discarded:
 
-[
-d_i^x le W,qquad
-d_i^y le L,qquad
-d_i^z le H.
-]
+$$
+d_i^x \le W,\qquad
+d_i^y \le L,\qquad
+d_i^z \le H.
+$$
 
 If an item has no remaining orientation, the instance is immediately infeasible.
 
-Implementation: `orientations.py`.
+Implementation: \`orientations.py\`.
 
 ---
 
@@ -113,40 +109,42 @@ Implementation: `orientations.py`.
 
 The solver does not build one large optimization model with the number of bins as the objective.
 
-Instead, it solves a sequence of **fixed-(K) feasibility problems**.
+Instead, it solves a sequence of **fixed-$K$ feasibility problems**.
 
 Let
 
-[
-LB le K^star le UB
-]
+$$
+LB \le K^\star \le UB
+$$
 
 be a lower and upper bound on the optimal number of bins. The solver checks
 
-[
-K = LB, LB+1, ldots, UB
-]
+$$
+K = LB, LB+1, \ldots, UB
+$$
 
 in ascending order.
 
-For each (K), CP-SAT answers:
+For each $K$, CP-SAT answers:
 
-> Can all items be packed using bin indices (0,ldots,K-1)?
+> Can all items be packed using bin indices $0,\ldots,K-1$?
 
-The first feasible (K) is optimal because feasibility is monotone:
+The first feasible $K$ is optimal because feasibility is monotone:
 
-[
-	ext{feasible}(K) Rightarrow 	ext{feasible}(K+1).
-]
+$$
+\operatorname{feasible}(K)
+\Rightarrow
+\operatorname{feasible}(K+1).
+$$
 
 This architecture has several advantages:
 
 - the CP-SAT model is a pure feasibility model,
-- no objective-specific symmetry is required inside the fixed-(K) model,
 - lower- and upper-bound improvements immediately reduce the search range,
-- each (K) can be benchmarked independently.
+- each $K$ can be benchmarked independently,
+- the same fixed-$K$ model can be reused for alternative search strategies.
 
-Implementation: `solver.py`.
+Implementation: \`solver.py\`.
 
 ---
 
@@ -156,9 +154,9 @@ A valid packing gives a mathematically valid upper bound.
 
 The theoretical fallback is
 
-[
+$$
 UB = N,
-]
+$$
 
 because preprocessing guarantees that every item can fit in a bin individually.
 
@@ -172,37 +170,31 @@ Three item orders are tried:
 
 For each order, items are inserted with a bottom-back-left style first-fit procedure.
 
-Candidate points are explored in
+Candidate points are explored in $(z,y,x)$ order, so lower placements are preferred first, followed by smaller $y$, then smaller $x$.
 
-[
-(z,y,x)
-]
+After an item with origin $(x,y,z)$ and size $(d_x,d_y,d_z)$ is placed, three new candidate points are generated:
 
-order, so lower placements are preferred first, followed by smaller (y), then smaller (x).
-
-After an item with origin ((x,y,z)) and size ((d_x,d_y,d_z)) is placed, three new candidate points are generated:
-
-[
+$$
 (x+d_x,y,z),
-]
+$$
 
-[
+$$
 (x,y+d_y,z),
-]
+$$
 
-[
+$$
 (x,y,z+d_z).
-]
+$$
 
-The best of the three greedy packings is used as the upper bound:
+The best greedy packing is used as the upper bound:
 
-[
-UB = min_r K_r.
-]
+$$
+UB = \min_r K_r.
+$$
 
 The same packing is also used as a CP-SAT solution hint.
 
-Implementation: `heuristic.py`.
+Implementation: \`heuristic.py\`.
 
 ---
 
@@ -214,25 +206,25 @@ The solver currently combines two valid lower bounds.
 
 Let
 
-[
+$$
 V_i = w_i l_i h_i
-]
+$$
 
 and
 
-[
+$$
 V_B = WLH.
-]
+$$
 
 Then
 
-[
-LB_{mathrm{vol}}
+$$
+LB_{\mathrm{vol}}
 =
-leftlceil
-rac{sum_i V_i}{V_B}
-ightceil.
-]
+\left\lceil
+\frac{\sum_i V_i}{V_B}
+\right\rceil.
+$$
 
 This is inexpensive but does not account for shape incompatibility.
 
@@ -240,53 +232,53 @@ This is inexpensive but does not account for shape incompatibility.
 
 Two items are pairwise incompatible if they cannot coexist in the same bin under **any** allowed orientation pair.
 
-For orientations (p in O_i) and (q in O_j), the pair can coexist only if at least one axis can separate them:
+For orientations $p \in O_i$ and $q \in O_j$, the pair can coexist only if at least one axis can separate them:
 
-[
-d_{ip}^x+d_{jq}^x le W
-]
-
-or
-
-[
-d_{ip}^y+d_{jq}^y le L
-]
+$$
+d_{ip}^x+d_{jq}^x \le W
+$$
 
 or
 
-[
-d_{ip}^z+d_{jq}^z le H.
-]
+$$
+d_{ip}^y+d_{jq}^y \le L
+$$
 
-If no orientation pair satisfies any of these conditions, items (i) and (j) must use different bins.
+or
+
+$$
+d_{ip}^z+d_{jq}^z \le H.
+$$
+
+If no orientation pair satisfies any of these conditions, items $i$ and $j$ must use different bins.
 
 This defines an incompatibility graph
 
-[
+$$
 G=(V,E).
-]
+$$
 
-Every clique of size (q) requires at least (q) bins:
+Every clique of size $q$ requires at least $q$ bins:
 
-[
-K^star ge q.
-]
+$$
+K^\star \ge q.
+$$
 
 The implementation uses a greedy clique heuristic rather than solving maximum clique exactly.
 
 The final lower bound is
 
-[
+$$
 LB
 =
-max
-(
-LB_{mathrm{vol}},
-LB_{mathrm{clique}}
-).
-]
+\max
+\left(
+LB_{\mathrm{vol}},
+LB_{\mathrm{clique}}
+\right).
+$$
 
-Implementation: `preprocess.py`.
+Implementation: \`preprocess.py\`.
 
 ---
 
@@ -294,25 +286,25 @@ Implementation: `preprocess.py`.
 
 Before creating geometric Boolean variables, the solver computes pair compatibility information.
 
-For item (i), define its componentwise minimum feasible extent:
+For item $i$, define its componentwise minimum feasible extent:
 
-[
-m_i^x = min_{pin O_i} d_{ip}^x,
-]
+$$
+m_i^x = \min_{p\in O_i} d_{ip}^x,
+$$
 
-[
-m_i^y = min_{pin O_i} d_{ip}^y,
-]
+$$
+m_i^y = \min_{p\in O_i} d_{ip}^y,
+$$
 
-[
-m_i^z = min_{pin O_i} d_{ip}^z.
-]
+$$
+m_i^z = \min_{p\in O_i} d_{ip}^z.
+$$
 
-For a pair (i,j), X separation is impossible for every orientation if
+For a pair $i,j$, X separation is impossible for every orientation if
 
-[
+$$
 m_i^x + m_j^x > W.
-]
+$$
 
 In that case, the model does not create either X-direction separation literal.
 
@@ -320,56 +312,55 @@ The same preprocessing is applied to Y and Z.
 
 If no axis can separate the pair, the model directly adds
 
-[
-b_i 
-e b_j.
-]
+$$
+b_i \ne b_j.
+$$
 
 This reduces the number of Boolean variables and strengthens propagation before search begins.
 
 The solver also precomputes an orientation-pair compatibility matrix for each item pair.
 
-Implementation: `preprocess.py`.
+Implementation: \`preprocess.py\`.
 
 ---
 
-## 7. Fixed-(K) variables
+## 7. Fixed-$K$ variables
 
-For a fixed number of bins (K), item (i) receives the following CP-SAT variables.
+For a fixed number of bins $K$, item $i$ receives the following CP-SAT variables.
 
 ### Bin assignment
 
-[
-b_i in {0,ldots,K-1}.
-]
+$$
+b_i \in \{0,\ldots,K-1\}.
+$$
 
 ### Orientation index
 
-[
-o_i in {0,ldots,|O_i|-1}.
-]
+$$
+o_i \in \{0,\ldots,|O_i|-1\}.
+$$
 
 ### Effective dimensions
 
-[
-d_i^x, d_i^y, d_i^z.
-]
+$$
+d_i^x,\ d_i^y,\ d_i^z.
+$$
 
 The orientation index and dimensions are linked by an allowed-assignment table:
 
-[
-(o_i,d_i^x,d_i^y,d_i^z) in T_i.
-]
+$$
+(o_i,d_i^x,d_i^y,d_i^z) \in T_i.
+$$
 
-This avoids writing separate rotation-specific model logic for `none`, `fixed_bottom`, and `all`.
+This avoids writing separate rotation-specific model logic for \`none\`, \`fixed_bottom\`, and \`all\`.
 
 ### Integer coordinates
 
-[
-x_i,y_i,z_i in mathbb Z_{ge 0}.
-]
+$$
+x_i,y_i,z_i \in \mathbb{Z}_{\ge 0}.
+$$
 
-Implementation: `cp_model.py`.
+Implementation: \`cp_model.py\`.
 
 ---
 
@@ -377,96 +368,95 @@ Implementation: `cp_model.py`.
 
 Every selected orientation must fit at its chosen coordinate:
 
-[
-x_i+d_i^x le W,
-]
+$$
+x_i+d_i^x \le W,
+$$
 
-[
-y_i+d_i^y le L,
-]
+$$
+y_i+d_i^y \le L,
+$$
 
-[
-z_i+d_i^z le H.
-]
+$$
+z_i+d_i^z \le H.
+$$
 
 The model therefore represents every item as an axis-aligned half-open box
 
-[
+$$
 [x_i,x_i+d_i^x)
-	imes
+\times
 [y_i,y_i+d_i^y)
-	imes
+\times
 [z_i,z_i+d_i^z).
-]
+$$
 
-Touching faces, edges, or corners are allowed because non-overlap uses (le), not (<).
+Touching faces, edges, or corners are allowed because non-overlap uses $\le$, not $<$.
 
 ---
 
 ## 9. Pairwise 3D non-overlap
 
-For every item pair (i<j), define
+For every item pair $i<j$, define
 
-[
-S_{ij} iff b_i=b_j.
-]
+$$
+S_{ij} \iff b_i=b_j.
+$$
 
 If the items use different bins, their local coordinates are independent and may overlap.
 
 If they use the same bin, at least one of six separating relations must hold:
 
-[
-x_i+d_i^x le x_j,
-]
+$$
+x_i+d_i^x \le x_j,
+$$
 
-[
-x_j+d_j^x le x_i,
-]
+$$
+x_j+d_j^x \le x_i,
+$$
 
-[
-y_i+d_i^y le y_j,
-]
+$$
+y_i+d_i^y \le y_j,
+$$
 
-[
-y_j+d_j^y le y_i,
-]
+$$
+y_j+d_j^y \le y_i,
+$$
 
-[
-z_i+d_i^z le z_j,
-]
+$$
+z_i+d_i^z \le z_j,
+$$
 
-[
-z_j+d_j^z le z_i.
-]
+$$
+z_j+d_j^z \le z_i.
+$$
 
 The logical constraint is therefore
 
-[
-
-eg S_{ij}
-lor X_{ij}
-lor X_{ji}
-lor Y_{ij}
-lor Y_{ji}
-lor Z_{ij}
-lor Z_{ji}.
-]
+$$
+\neg S_{ij}
+\lor X_{ij}
+\lor X_{ji}
+\lor Y_{ij}
+\lor Y_{ji}
+\lor Z_{ij}
+\lor Z_{ji}.
+$$
 
 Only directions proven possible by preprocessing are created.
 
 Each directional literal uses CP-SAT reification, for example
 
-[
+$$
 X_{ij}
-Rightarrow
-x_i+d_i^x le x_j.
-]
+\Rightarrow
+x_i+d_i^x \le x_j.
+$$
 
 The default model uses **half reification**. It does not require the converse implication.
 
 No Big-M constant is used.
 
-Implementation: `cp_model.py`.
+Implementation: \`cp_model.py\`.
 
 ---
 
@@ -474,12 +464,11 @@ Implementation: `cp_model.py`.
 
 A full equivalence would also add
 
-[
-
-eg X_{ij}
-Rightarrow
+$$
+\neg X_{ij}
+\Rightarrow
 x_i+d_i^x > x_j.
-]
+$$
 
 That makes the Boolean literal exactly represent the truth value of the geometric inequality.
 
@@ -495,43 +484,37 @@ Axis-level preprocessing can only remove a direction if it is impossible for **a
 
 The solver adds a stronger table constraint for orientation pairs.
 
-For each pair (i,j), precompute
-
-[
-C_{ijpq}
-]
-
-for every orientation pair (p in O_i), (q in O_j).
+For each pair $i,j$, precompute $C_{ijpq}$ for every orientation pair $p \in O_i$, $q \in O_j$.
 
 The pair is compatible in the same bin if
 
-[
+$$
 C_{ijpq}=1
-]
+$$
 
 whenever at least one axis can separate the two selected orientations.
 
 The CP-SAT table over
 
-[
+$$
 (S_{ij},o_i,o_j)
-]
+$$
 
 allows every orientation pair when
 
-[
+$$
 S_{ij}=0,
-]
+$$
 
 but only compatible orientation pairs when
 
-[
+$$
 S_{ij}=1.
-]
+$$
 
 This propagates rotation and bin-assignment decisions before coordinates are fully fixed.
 
-Implementation: `cp_model.py`.
+Implementation: \`cp_model.py\`.
 
 ---
 
@@ -539,25 +522,13 @@ Implementation: `cp_model.py`.
 
 For one axis, the two directions are mutually exclusive for positive-sized items.
 
-For example,
-
-[
-X_{ij}
-]
-
-and
-
-[
-X_{ji}
-]
-
-cannot both be true.
+For example, $X_{ij}$ and $X_{ji}$ cannot both be true.
 
 The model therefore optionally posts
 
-[
-operatorname{AtMostOne}(X_{ij},X_{ji}),
-]
+$$
+\operatorname{AtMostOne}(X_{ij},X_{ji}),
+$$
 
 and similarly for Y and Z.
 
@@ -571,39 +542,29 @@ It is enabled by default.
 
 All bins are identical, so permutations of bin labels create equivalent solutions.
 
-Without symmetry breaking, a packing using bins
-
-[
-(0,1,2)
-]
-
-has many equivalent representations such as
-
-[
-(2,0,1).
-]
+Without symmetry breaking, a packing using bins $(0,1,2)$ has many equivalent representations such as $(2,0,1)$.
 
 Items are first ordered deterministically by decreasing volume, then item ID.
 
 The model fixes
 
-[
+$$
 b_0=0
-]
+$$
 
 and uses restricted-growth numbering:
 
-[
+$$
 b_i
-le
-1+max_{j<i} b_j.
-]
+\le
+1+\max_{j<i} b_j.
+$$
 
 Therefore a new bin label may only be introduced after all smaller labels are already reachable.
 
 Used bin indices become consecutive from zero, removing a large class of equivalent search states.
 
-Implementation: `cp_model.py`.
+Implementation: \`cp_model.py\`.
 
 ---
 
@@ -621,7 +582,7 @@ Because symmetry breaking may relabel bins, the greedy bin indices are first nor
 
 Hints do not affect correctness. They only provide CP-SAT with a promising initial assignment.
 
-Implementation: `solver.py`.
+Implementation: \`solver.py\`.
 
 ---
 
@@ -632,54 +593,50 @@ The complete search pipeline is:
 1. run the constructive greedy heuristic,
 2. generate and filter orientations,
 3. compute pair compatibility,
-4. compute (LB),
-5. take greedy bin count as (UB),
-6. for (K=LB,ldots,UB):
-   - build the fixed-(K) model,
+4. compute $LB$,
+5. take greedy bin count as $UB$,
+6. for $K=LB,\ldots,UB$:
+   - build the fixed-$K$ model,
    - add hints,
    - solve the feasibility problem,
-   - stop at the first feasible (K).
+   - stop at the first feasible $K$.
 
-If every smaller (K) has been proven infeasible and (K) is feasible, then
+If every smaller $K$ has been proven infeasible and $K$ is feasible, then
 
-[
-K = K^star.
-]
+$$
+K = K^\star.
+$$
 
-The returned solution has
+The returned solution has \`optimal=True\`.
 
-`optimal=True`.
-
-If the global time budget expires, or CP-SAT returns `UNKNOWN` for some (K), smaller bin counts have not all been ruled out. In that case the solver returns the valid greedy packing with
-
-`optimal=False`.
+If the global time budget expires, or CP-SAT returns \`UNKNOWN\` for some $K$, smaller bin counts have not all been ruled out. In that case the solver returns the valid greedy packing with \`optimal=False\`.
 
 This distinction is important:
 
-- `optimal=True`: minimum bin count is proven,
-- `optimal=False`: returned packing is valid, but may use more bins than the unknown optimum.
+- \`optimal=True\`: minimum bin count is proven,
+- \`optimal=False\`: returned packing is valid, but may use more bins than the unknown optimum.
 
 ---
 
 ## 16. Time limits
 
-`SolverOptions.time_limit` applies to the **entire** search over
+\`SolverOptions.time_limit\` applies to the **entire** search over
 
-[
+$$
 [LB,UB],
-]
+$$
 
-not independently to every fixed-(K) model.
+not independently to every fixed-$K$ model.
 
 This prevents total runtime from growing proportionally with the width of the bound interval.
 
-An optional `per_k_time_limit` can additionally cap each individual fixed-(K) solve.
+An optional \`per_k_time_limit\` can additionally cap each individual fixed-$K$ solve.
 
 ---
 
 ## 17. Independent validation
 
-Every returned solution is independently checked by `validate` unless verification is disabled.
+Every returned solution is independently checked by \`validate\` unless verification is disabled.
 
 The validator checks:
 
@@ -691,33 +648,33 @@ The validator checks:
 
 Keeping validation outside the CP-SAT model is useful for detecting modeling or extraction bugs.
 
-Implementation: `validate.py`.
+Implementation: \`validate.py\`.
 
 ---
 
 ## 18. Complexity
 
-For (N) items, the geometric model considers
+For $N$ items, the geometric model considers
 
-[
-inom{N}{2}
-]
+$$
+\binom{N}{2}
+$$
 
 item pairs.
 
-In the worst case, each pair creates six separation literals, so the Boolean part is (O(N^2)).
+In the worst case, each pair creates six separation literals, so the Boolean part is $O(N^2)$.
 
 Rotation adds at most six orientations per item, and the orientation-pair compatibility table for a pair has at most
 
-[
-6	imes6=36
-]
+$$
+6\times6=36
+$$
 
 orientation combinations.
 
 The main practical performance techniques are therefore:
 
-- reduce the range ([LB,UB]),
+- reduce the range $[LB,UB]$,
 - remove impossible orientations,
 - remove impossible separation axes,
 - force incompatible pairs into different bins,
@@ -734,21 +691,21 @@ The current implementation intentionally leaves some global-constraint strengthe
 
 For one bin, an X-axis cumulative relaxation would use interval
 
-[
+$$
 [x_i,x_i+d_i^x)
-]
+$$
 
 with cross-sectional demand
 
-[
+$$
 d_i^y d_i^z
-]
+$$
 
 and capacity
 
-[
+$$
 LH.
-]
+$$
 
 Analogous relaxations exist for Y and Z.
 
@@ -758,11 +715,11 @@ With rotations, interval lengths and cross-sectional areas are variable, so an e
 
 If preprocessing proves a set of items cannot separate along Z, then their XY projections must not overlap.
 
-Such subsets can be strengthened with `NoOverlap2D`.
+Such subsets can be strengthened with \`NoOverlap2D\`.
 
 ### Conditional NoOverlap
 
-If a set of items cannot separate along two axes, they must be ordered along the remaining axis and can be strengthened with one-dimensional `NoOverlap`.
+If a set of items cannot separate along two axes, they must be ordered along the remaining axis and can be strengthened with one-dimensional \`NoOverlap\`.
 
 These constraints do not change feasibility; they are intended only to improve propagation.
 
@@ -772,13 +729,13 @@ These constraints do not change feasibility; they are intended only to improve p
 
 | Module | Responsibility |
 | --- | --- |
-| `models.py` | Domain objects and geometry primitives |
-| `orientations.py` | Rotation generation, deduplication, fit filtering |
-| `preprocess.py` | Lower bounds, compatibility data, incompatibility graph |
-| `heuristic.py` | Constructive upper bound and hint generation source |
-| `cp_model.py` | Fixed-(K) CP-SAT feasibility model |
-| `solver.py` | Minimum-bin search over (K) |
-| `validate.py` | Independent solution validation |
+| \`models.py\` | Domain objects and geometry primitives |
+| \`orientations.py\` | Rotation generation, deduplication, fit filtering |
+| \`preprocess.py\` | Lower bounds, compatibility data, incompatibility graph |
+| \`heuristic.py\` | Constructive upper bound and hint generation source |
+| \`cp_model.py\` | Fixed-$K$ CP-SAT feasibility model |
+| \`solver.py\` | Minimum-bin search over $K$ |
+| \`validate.py\` | Independent solution validation |
 
 ---
 
@@ -786,38 +743,37 @@ These constraints do not change feasibility; they are intended only to improve p
 
 The solver combines a constructive heuristic with exact CP-SAT feasibility search:
 
-[
-oxed{
-	ext{preprocess}
-ightarrow
+$$
+\boxed{
+\text{preprocess}
+\rightarrow
 (LB,UB)
-ightarrow
-	ext{fixed-}K	ext{ CP-SAT}
-ightarrow
-	ext{first feasible }K
+\rightarrow
+\text{fixed-}K\text{ CP-SAT}
+\rightarrow
+\text{first feasible }K
 }
-]
+$$
 
 The core geometric constraint is:
 
-[
-oxed{
-b_i 
-e b_j
-;lor;
+$$
+\boxed{
+b_i \ne b_j
+\;\lor\;
 X_{ij}
-;lor;
+\;\lor\;
 X_{ji}
-;lor;
+\;\lor\;
 Y_{ij}
-;lor;
+\;\lor\;
 Y_{ji}
-;lor;
+\;\lor\;
 Z_{ij}
-;lor;
+\;\lor\;
 Z_{ji}
 }
-]
+$$
 
 with orientation-dependent integer dimensions and no Big-M formulation.
 
@@ -825,6 +781,6 @@ The result is a compact exact model that supports per-item rotation policies whi
 
 - heuristic upper bounding,
 - preprocessing,
-- fixed-(K) feasibility,
+- fixed-$K$ feasibility,
 - optimality proof,
 - independent validation.
