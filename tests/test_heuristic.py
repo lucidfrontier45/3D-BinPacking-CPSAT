@@ -1,5 +1,9 @@
 """Greedy packing heuristic used for the upper bound and hints."""
 
+from typing import cast
+
+import pytest
+
 from bp_cpsat import (
     Bin,
     Item,
@@ -86,3 +90,44 @@ def test_stacking_is_allowed() -> None:
     low = min(solution.placements, key=lambda placement: placement.origin.z)
     high = max(solution.placements, key=lambda placement: placement.origin.z)
     assert low.origin.z + low.shape.height == high.origin.z
+
+
+# Shapes chosen so the orderings genuinely disagree: ``base_area`` needs two
+# bins where ``volume`` needs one, so parity cannot hold by coincidence.
+DISCRIMINATING_ITEMS = [
+    Item(f"i{k}", Shape(w, l, h), RotationType.ALL)
+    for k, (w, l, h) in enumerate(
+        [(1, 2, 1), (1, 2, 7), (1, 2, 7), (1, 3, 3), (1, 2, 2), (3, 2, 4)]
+    )
+]
+DISCRIMINATING_BIN = Bin(3, 4, 7)
+
+
+def test_the_orderings_actually_differ_on_the_discriminating_instance() -> None:
+    """Guard the fixture: the parity test below is only meaningful if the
+    orderings produce different packings to begin with."""
+    counts = set()
+    for order in ItemOrder:
+        solution = greedy_pack(DISCRIMINATING_ITEMS, DISCRIMINATING_BIN, order=order)
+        assert solution is not None
+        counts.add(solution.bin_count)
+    assert len(counts) > 1
+
+
+@pytest.mark.parametrize("order", list(ItemOrder))
+def test_string_order_matches_enum_member(order: ItemOrder) -> None:
+    """``ItemOrder`` is a ``StrEnum``, so ``order is ItemOrder.BASE_AREA`` misses
+    a plain string that is value-equal to the member, silently degrading to the
+    ``VOLUME`` default instead of raising."""
+    as_member = greedy_pack(DISCRIMINATING_ITEMS, DISCRIMINATING_BIN, order=order)
+    as_string = greedy_pack(
+        DISCRIMINATING_ITEMS, DISCRIMINATING_BIN, order=cast(ItemOrder, str(order))
+    )
+    assert as_member is not None
+    assert as_string is not None
+    assert as_string == as_member
+
+
+def test_unknown_order_string_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        greedy_pack(DISCRIMINATING_ITEMS, DISCRIMINATING_BIN, order=cast(ItemOrder, "nope"))

@@ -31,9 +31,14 @@ class ItemOrder(StrEnum):
 
 
 def _sorted_items(items: Sequence[Item], order: ItemOrder) -> list[Item]:
-    if order is ItemOrder.MAX_DIMENSION:
+    # ``ItemOrder`` is a ``StrEnum``, so a plain string is value-equal but not
+    # identity-equal to a member. Coerce once, the way ``Item.__post_init__``
+    # does for ``rotation``, so the identity checks below cannot miss a caller
+    # that passed ``order="base_area"`` and silently fall back to ``VOLUME``.
+    policy = ItemOrder(order)
+    if policy is ItemOrder.MAX_DIMENSION:
         return sorted(items, key=lambda item: (-item.max_dimension, -item.volume, item.id))
-    if order is ItemOrder.BASE_AREA:
+    if policy is ItemOrder.BASE_AREA:
         return sorted(items, key=lambda item: (-item.base_area, -item.volume, item.id))
     return sorted(items, key=lambda item: (-item.volume, item.id))
 
