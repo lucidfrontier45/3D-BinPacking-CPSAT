@@ -51,7 +51,7 @@ where $K$ is the number of bins used.
 
 Each item has one of three rotation policies.
 
-### \`none\`
+### none
 
 No rotation is allowed:
 
@@ -59,7 +59,7 @@ $$
 O_i = \{(w_i,l_i,h_i)\}.
 $$
 
-### \`fixed_bottom\`
+### fixed_bottom
 
 The vertical axis is fixed and only a 90-degree rotation in the base plane is allowed:
 
@@ -73,7 +73,7 @@ $$
 
 This does **not** mean the item must lie on the floor of the bin. It may still be stacked at $z_i > 0$.
 
-### \`all\`
+### all
 
 All six axis-aligned permutations are allowed:
 
@@ -324,7 +324,7 @@ Implementation: \`preprocess.py\`.
 
 ---
 
-## 7. Fixed-$K$ variables
+## 7. Fixed-K variables
 
 For a fixed number of bins $K$, item $i$ receives the following CP-SAT variables.
 
