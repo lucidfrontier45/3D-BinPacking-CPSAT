@@ -96,9 +96,7 @@ def test_prepare_orders_items_by_decreasing_volume_then_id() -> None:
     items = [Item("small", 2, 2, 2), Item("big", 5, 5, 5), Item("also-big", 5, 5, 5)]
     prepared = _prepared(items)
     assert [item.id for item in prepared.items] == ["also-big", "big", "small"]
-    assert (
-        prepared.items[0].volume >= prepared.items[1].volume >= prepared.items[2].volume
-    )
+    assert prepared.items[0].volume >= prepared.items[1].volume >= prepared.items[2].volume
 
 
 def test_prepare_records_total_volume_and_bounds() -> None:

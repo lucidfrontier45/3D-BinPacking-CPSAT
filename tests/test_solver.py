@@ -36,9 +36,7 @@ def _solution(items: list[Item], bin_capacity: Bin = BIN) -> PackingSolution | N
     return solution
 
 
-def _positions(
-    items: list[Item], bin_capacity: Bin = BIN
-) -> dict[str, tuple[int, int, int]]:
+def _positions(items: list[Item], bin_capacity: Bin = BIN) -> dict[str, tuple[int, int, int]]:
     solution = _solution(items, bin_capacity)
     assert solution is not None
     return {
@@ -296,12 +294,8 @@ def test_full_reification_adds_exactly_one_constraint_per_separation() -> None:
 
 def test_hints_are_optional() -> None:
     items = [Item(f"i{k}", 5, 5, 5) for k in range(16)]
-    with_hints = solve(
-        items, BIN, options=SolverOptions(time_limit=15.0, use_hints=True)
-    )
-    without_hints = solve(
-        items, BIN, options=SolverOptions(time_limit=15.0, use_hints=False)
-    )
+    with_hints = solve(items, BIN, options=SolverOptions(time_limit=15.0, use_hints=True))
+    without_hints = solve(items, BIN, options=SolverOptions(time_limit=15.0, use_hints=False))
     assert with_hints is not None and without_hints is not None
     assert with_hints.bin_count == without_hints.bin_count == 2
 
@@ -394,17 +388,13 @@ def test_unknown_fallback_is_verified(monkeypatch: pytest.MonkeyPatch) -> None:
         def solve(self, model: cp_model.CpModel) -> cp_model.CpSolverStatus:
             return cp_model.UNKNOWN
 
-    monkeypatch.setattr(
-        solver_module, "_make_solver", lambda options, time_limit: UnknownSolver()
-    )
+    monkeypatch.setattr(solver_module, "_make_solver", lambda options, time_limit: UnknownSolver())
     monkeypatch.setattr(
         solver_module,
         "validate",
         lambda items, bin_capacity, solution: validation_calls.append(True),
     )
-    solution = solve(
-        [Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None)
-    )
+    solution = solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None))
     assert solution is not None
     assert solution.optimal is False
     assert validation_calls == [True]

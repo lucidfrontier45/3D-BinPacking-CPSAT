@@ -100,9 +100,7 @@ class FixedKModel:
             self.model.add_hint(self.y_vars[index], hint.y)
             self.model.add_hint(self.z_vars[index], hint.z)
 
-    def extract(
-        self, solver: cp_model.CpSolver, problem: PreparedProblem
-    ) -> PackingSolution:
+    def extract(self, solver: cp_model.CpSolver, problem: PreparedProblem) -> PackingSolution:
         """Read the incumbent out of ``solver`` and turn it into a solution."""
         placements: list[Placement] = []
         for index, prepared in enumerate(problem.items):
@@ -168,9 +166,7 @@ def _orientation_table(
     return allowed
 
 
-def build_fixed_k_model(
-    problem: PreparedProblem, k: int, options: ModelOptions
-) -> FixedKModel:
+def build_fixed_k_model(problem: PreparedProblem, k: int, options: ModelOptions) -> FixedKModel:
     """Build the fixed-``k`` feasibility model (no objective, no Big-M)."""
     if k < 1 and problem.item_count > 0:
         msg = f"k must be at least 1 when items exist, got {k}"
@@ -208,15 +204,9 @@ def build_fixed_k_model(
             max(o.height for o in orientations),
             f"dz_{index}",
         )
-        x_var = model.new_int_var(
-            0, bin_capacity.width - prepared.min_width, f"x_{index}"
-        )
-        y_var = model.new_int_var(
-            0, bin_capacity.length - prepared.min_length, f"y_{index}"
-        )
-        z_var = model.new_int_var(
-            0, bin_capacity.height - prepared.min_height, f"z_{index}"
-        )
+        x_var = model.new_int_var(0, bin_capacity.width - prepared.min_width, f"x_{index}")
+        y_var = model.new_int_var(0, bin_capacity.length - prepared.min_length, f"y_{index}")
+        z_var = model.new_int_var(0, bin_capacity.height - prepared.min_height, f"z_{index}")
 
         model.add_allowed_assignments(
             [orientation_var, width_var, length_var, height_var],

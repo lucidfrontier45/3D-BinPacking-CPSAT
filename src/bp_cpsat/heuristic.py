@@ -25,9 +25,7 @@ class ItemOrder(StrEnum):
 
 def _sorted_items(items: Sequence[Item], order: ItemOrder) -> list[Item]:
     if order is ItemOrder.MAX_DIMENSION:
-        return sorted(
-            items, key=lambda item: (-item.max_dimension, -item.volume, item.id)
-        )
+        return sorted(items, key=lambda item: (-item.max_dimension, -item.volume, item.id))
     if order is ItemOrder.BASE_AREA:
         return sorted(items, key=lambda item: (-item.base_area, -item.volume, item.id))
     return sorted(items, key=lambda item: (-item.volume, item.id))
@@ -119,9 +117,7 @@ def greedy_pack(
             return None
         found: tuple[int, Point, Orientation] | None = None
         for index, placements in enumerate(bin_placements):
-            position = _first_position(
-                bin_capacity, placements, bin_points[index], orientations
-            )
+            position = _first_position(bin_capacity, placements, bin_points[index], orientations)
             if position is not None:
                 found = (index, *position)
                 break
@@ -131,9 +127,7 @@ def greedy_pack(
             index = len(bin_placements)
             bin_points.append({(0, 0, 0)})
             bin_placements.append([])
-            position = _first_position(
-                bin_capacity, [], bin_points[index], orientations
-            )
+            position = _first_position(bin_capacity, [], bin_points[index], orientations)
             if position is None:  # pragma: no cover - orientations are pre-filtered
                 return None
             found = (index, *position)
@@ -154,14 +148,10 @@ def greedy_pack(
         _extend_points(bin_capacity, bin_points[index], (x, y, z), orientation)
 
     placements = tuple(placement for group in bin_placements for placement in group)
-    return PackingSolution(
-        bin_count=len(bin_placements), placements=placements, optimal=False
-    )
+    return PackingSolution(bin_count=len(bin_placements), placements=placements, optimal=False)
 
 
-def best_greedy_pack(
-    items: Sequence[Item], bin_capacity: Bin
-) -> PackingSolution | None:
+def best_greedy_pack(items: Sequence[Item], bin_capacity: Bin) -> PackingSolution | None:
     """Run every ordering and keep the packing with the fewest bins."""
     best: PackingSolution | None = None
     for order in ItemOrder:

@@ -34,25 +34,10 @@ test = "pytest tests"
 filterwarnings = ["ignore::FutureWarning"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
+line-length = 100
 
 [tool.ruff.lint]
-select = [
-    "E",
-    "F",
-    "W",
-    "I",
-    "B",
-    "RUF",
-    "UP",
-    "N",
-    "SIM",
-    "A",
-    "S",
-    "DTZ",
-    "PIE",
-    "PLE",
-]
 # add directory names to exclude from analysis
 exclude = ["tests/**/*", "deps/**/*"]
 

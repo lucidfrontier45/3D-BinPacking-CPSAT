@@ -58,9 +58,7 @@ def validation_errors(
             errors.append(f"item {placement.item_id!r} has negative bin index")
         dims = (placement.width, placement.length, placement.height)
         if dims not in _rotations_allowed(item):
-            errors.append(
-                f"item {placement.item_id!r} uses disallowed orientation {dims}"
-            )
+            errors.append(f"item {placement.item_id!r} uses disallowed orientation {dims}")
         if (
             placement.x < 0
             or placement.y < 0
@@ -100,9 +98,7 @@ def validation_errors(
     return tuple(errors)
 
 
-def validate(
-    items: Sequence[Item], bin_capacity: Bin, solution: PackingSolution
-) -> None:
+def validate(items: Sequence[Item], bin_capacity: Bin, solution: PackingSolution) -> None:
     """Raise :class:`ValidationError` unless ``solution`` is a valid packing."""
     errors = validation_errors(items, bin_capacity, solution)
     if errors:

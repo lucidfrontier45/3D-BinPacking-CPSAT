@@ -155,9 +155,7 @@ def incompatibility_clique_lower_bound(
     return _greedy_clique(dense)
 
 
-def prepare(
-    items: Sequence[Item], bin_capacity: Bin, greedy: PackingSolution
-) -> PreparedProblem:
+def prepare(items: Sequence[Item], bin_capacity: Bin, greedy: PackingSolution) -> PreparedProblem:
     """Build the canonical, deterministically ordered instance description.
 
     Raises :class:`InfeasibleInstanceError` when an item cannot fit in a bin.
@@ -172,8 +170,7 @@ def prepare(
         orientations = allowed_orientations(item, bin_capacity)
         if not orientations:
             msg = (
-                f"item {item.id!r} does not fit in the bin "
-                f"under rotation policy {item.rotation!s}"
+                f"item {item.id!r} does not fit in the bin under rotation policy {item.rotation!s}"
             )
             raise InfeasibleInstanceError(msg)
         prepared_items.append(PreparedItem(item=item, orientations=orientations))
@@ -182,9 +179,7 @@ def prepare(
     pairs: dict[tuple[int, int], PairCompatibility] = {}
     for i in range(len(items_tuple)):
         for j in range(i + 1, len(items_tuple)):
-            pairs[(i, j)] = build_pair_compatibility(
-                items_tuple[i], items_tuple[j], bin_capacity
-            )
+            pairs[(i, j)] = build_pair_compatibility(items_tuple[i], items_tuple[j], bin_capacity)
 
     return PreparedProblem(
         bin_capacity=bin_capacity,

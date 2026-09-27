@@ -21,11 +21,14 @@ def test_none_produces_exactly_one_orientation() -> None:
 def test_string_rotation_policy_is_coerced_to_enum(rotation: str) -> None:
     item = Item("a", 3, 4, 5, cast(RotationType, rotation))
     assert item.rotation is RotationType(rotation)
-    assert len(candidate_orientations(item)) == {
-        "none": 1,
-        "fixed_bottom": 2,
-        "all": 6,
-    }[rotation]
+    assert (
+        len(candidate_orientations(item))
+        == {
+            "none": 1,
+            "fixed_bottom": 2,
+            "all": 6,
+        }[rotation]
+    )
 
 
 def test_invalid_rotation_policy_is_rejected() -> None:
