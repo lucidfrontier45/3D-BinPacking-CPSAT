@@ -9,13 +9,13 @@ of bins used.
 # Usage
 
 ```python
-from bp_cpsat import Bin, Item, RotationType, solve, validate
+from bp_cpsat import Bin, Item, RotationType, Shape, solve, validate
 
 bin_capacity = Bin(width=10, length=10, height=10)
 items = [
-    Item("a", 6, 6, 6),
-    Item("b", 4, 5, 6, RotationType.ALL),
-    Item("c", 8, 8, 4, RotationType.FIXED_BOTTOM),
+    Item("a", Shape(6, 6, 6)),
+    Item("b", Shape(4, 5, 6), RotationType.ALL),
+    Item("c", Shape(8, 8, 4), RotationType.FIXED_BOTTOM),
 ]
 
 solution = solve(items, bin_capacity)
@@ -24,7 +24,7 @@ validate(items, bin_capacity, solution)
 
 print(solution.bin_count)  # proven minimum number of bins
 for placement in solution.placements:
-    print(placement.item_id, placement.bin_index, placement.x, placement.y, placement.z)
+    print(placement.item_id, placement.bin_index, placement.origin.as_tuple())
 ```
 
 `solve` returns `None` only when the instance is *proven* infeasible — for
@@ -50,9 +50,11 @@ optimality guarantees for faster returns.
 
 | Name | Description |
 | --- | --- |
-| `Bin(width, length, height)` | Bin capacity, shared by all bins of an instance |
-| `Item(id, width, length, height, rotation)` | Item with `RotationType.NONE` / `FIXED_BOTTOM` / `ALL` |
-| `Placement` / `PackingSolution` | Immutable result objects, independent of OR-Tools |
+| `Bin(width, length, height)` | Bin capacity, shared by all bins of an instance; a `Shape` |
+| `Shape(width, length, height)` | Pure extent; `volume`, `base_area`, `fits_in`, `fits_beside` |
+| `Coordinate(x, y, z)` | Non-negative point in bin space; `end(shape)`, `offset(...)`, `fits_box(...)` |
+| `Item(id, shape, rotation)` | Item with `RotationType.NONE` / `FIXED_BOTTOM` / `ALL` |
+| `Placement(item_id, bin_index, origin, shape)` | One placed box; `corner`, `fits_in(bin)`, `overlaps(other)` |
 | `solve(items, bin, options=...)` | Minimum-bin search, returns `PackingSolution \| None` |
 | `SolverOptions(...)` | Time limit, worker count, hints, validation, `ModelOptions` |
 | `validate(items, bin, solution)` | Independent validator, raises `ValidationError` |

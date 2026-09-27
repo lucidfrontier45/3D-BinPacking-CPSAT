@@ -15,6 +15,7 @@ from bp_cpsat import (
     PackingSolution,
     PreparedProblem,
     RotationType,
+    Shape,
     SolverOptions,
     best_greedy_pack,
     build_fixed_k_model,
@@ -39,10 +40,7 @@ def _solution(items: list[Item], bin_capacity: Bin = BIN) -> PackingSolution | N
 def _positions(items: list[Item], bin_capacity: Bin = BIN) -> dict[str, tuple[int, int, int]]:
     solution = _solution(items, bin_capacity)
     assert solution is not None
-    return {
-        placement.item_id: (placement.x, placement.y, placement.z)
-        for placement in solution.placements
-    }
+    return {placement.item_id: placement.origin.as_tuple() for placement in solution.placements}
 
 
 def _bin_count(items: list[Item], bin_capacity: Bin = BIN) -> int | None:
@@ -57,24 +55,24 @@ def _problem(items: list[Item], bin_capacity: Bin = BIN) -> PreparedProblem:
 
 
 def test_single_item_that_fits() -> None:
-    items = [Item("a", 4, 5, 6)]
+    items = [Item("a", Shape(4, 5, 6))]
     assert _bin_count(items) == 1
 
 
 def test_single_item_that_cannot_fit_is_infeasible() -> None:
-    items = [Item("big", 12, 8, 5, RotationType.NONE)]
+    items = [Item("big", Shape(12, 8, 5), RotationType.NONE)]
     assert solve(items, BIN, options=FAST) is None
 
 
 def test_single_item_fits_only_after_rotation() -> None:
     bin_capacity = Bin(10, 6, 10)
-    items = [Item("big", 7, 8, 5, RotationType.ALL)]
-    assert _bin_count([Item("big", 7, 8, 5, RotationType.NONE)], bin_capacity) is None
+    items = [Item("big", Shape(7, 8, 5), RotationType.ALL)]
+    assert _bin_count([Item("big", Shape(7, 8, 5), RotationType.NONE)], bin_capacity) is None
     assert _bin_count(items, bin_capacity) == 1
 
 
 def test_two_items_side_by_side_on_x() -> None:
-    items = [Item("a", 6, 10, 10), Item("b", 4, 10, 10)]
+    items = [Item("a", Shape(6, 10, 10)), Item("b", Shape(4, 10, 10))]
     assert _bin_count(items) == 1
     first, second = _positions(items).values()
     assert first[1:] == second[1:] == (0, 0)
@@ -82,7 +80,7 @@ def test_two_items_side_by_side_on_x() -> None:
 
 
 def test_two_items_side_by_side_on_y() -> None:
-    items = [Item("a", 10, 6, 10), Item("b", 10, 4, 10)]
+    items = [Item("a", Shape(10, 6, 10)), Item("b", Shape(10, 4, 10))]
     assert _bin_count(items) == 1
     first, second = _positions(items).values()
     assert first[0] == second[0] == 0
@@ -91,7 +89,7 @@ def test_two_items_side_by_side_on_y() -> None:
 
 
 def test_two_items_side_by_side_on_z() -> None:
-    items = [Item("a", 10, 10, 6), Item("b", 10, 10, 4)]
+    items = [Item("a", Shape(10, 10, 6)), Item("b", Shape(10, 10, 4))]
     assert _bin_count(items) == 1
     first, second = _positions(items).values()
     assert first[:2] == second[:2] == (0, 0)
@@ -99,25 +97,25 @@ def test_two_items_side_by_side_on_z() -> None:
 
 
 def test_two_items_that_require_different_bins() -> None:
-    items = [Item("a", 6, 6, 6), Item("b", 6, 6, 6)]
+    items = [Item("a", Shape(6, 6, 6)), Item("b", Shape(6, 6, 6))]
     assert _bin_count(items) == 2
 
 
 def test_stacking_with_overlapping_projections() -> None:
-    items = [Item("a", 8, 8, 4), Item("b", 8, 8, 4)]
+    items = [Item("a", Shape(8, 8, 4)), Item("b", Shape(8, 8, 4))]
     solution = solve(items, BIN, options=FAST)
     assert solution is not None
     validate(items, BIN, solution)
     assert solution.bin_count == 1
     first, second = solution.placements
     assert first.bin_index == second.bin_index
-    assert first.x < second.x_end and second.x < first.x_end
-    assert first.y < second.y_end and second.y < first.y_end
-    assert first.z_end <= second.z or second.z_end <= first.z
+    assert first.origin.x < second.corner.x and second.origin.x < first.corner.x
+    assert first.origin.y < second.corner.y and second.origin.y < first.corner.y
+    assert first.corner.z <= second.origin.z or second.corner.z <= first.origin.z
 
 
 def test_touching_coordinates_do_not_overlap() -> None:
-    items = [Item("a", 5, 10, 10), Item("b", 5, 10, 10)]
+    items = [Item("a", Shape(5, 10, 10)), Item("b", Shape(5, 10, 10))]
     assert _bin_count(items) == 1
     first, second = _positions(items).values()
     assert first[1:] == second[1:] == (0, 0)
@@ -125,28 +123,28 @@ def test_touching_coordinates_do_not_overlap() -> None:
 
 
 def test_rotation_none_needs_two_bins_fixed_bottom_needs_one() -> None:
-    base = Item("a", 3, 6, 6, RotationType.NONE)
-    none = [base, Item("b", 8, 6, 6, RotationType.NONE)]
-    fixed_bottom = [base, Item("b", 8, 6, 6, RotationType.FIXED_BOTTOM)]
+    base = Item("a", Shape(3, 6, 6), RotationType.NONE)
+    none = [base, Item("b", Shape(8, 6, 6), RotationType.NONE)]
+    fixed_bottom = [base, Item("b", Shape(8, 6, 6), RotationType.FIXED_BOTTOM)]
     assert _bin_count(none) == 2
     assert _bin_count(fixed_bottom) == 1
 
 
 def test_rotation_fixed_bottom_needs_two_bins_all_needs_one() -> None:
-    base = Item("a", 4, 5, 7, RotationType.NONE)
-    fixed_bottom = [base, Item("b", 8, 9, 6, RotationType.FIXED_BOTTOM)]
-    everything = [base, Item("b", 8, 9, 6, RotationType.ALL)]
+    base = Item("a", Shape(4, 5, 7), RotationType.NONE)
+    fixed_bottom = [base, Item("b", Shape(8, 9, 6), RotationType.FIXED_BOTTOM)]
+    everything = [base, Item("b", Shape(8, 9, 6), RotationType.ALL)]
     assert _bin_count(fixed_bottom) == 2
     assert _bin_count(everything) == 1
 
 
 def test_all_items_fit_in_one_bin() -> None:
-    items = [Item(f"i{k}", 4, 4, 4, RotationType.ALL) for k in range(8)]
+    items = [Item(f"i{k}", Shape(4, 4, 4), RotationType.ALL) for k in range(8)]
     assert _bin_count(items) == 1
 
 
 def test_known_two_bin_instance() -> None:
-    items = [Item("a", 6, 6, 6), Item("b", 6, 6, 6)]
+    items = [Item("a", Shape(6, 6, 6)), Item("b", Shape(6, 6, 6))]
     solution = solve(items, BIN, options=FAST)
     assert solution is not None
     assert solution.bin_count == 2
@@ -154,7 +152,7 @@ def test_known_two_bin_instance() -> None:
 
 
 def test_volume_lower_bound_is_tight() -> None:
-    items = [Item(f"i{k}", 5, 5, 5) for k in range(16)]
+    items = [Item(f"i{k}", Shape(5, 5, 5)) for k in range(16)]
     problem = _problem(items)
     assert problem.volume_lower_bound == 2
     assert problem.clique_lower_bound == 1
@@ -163,7 +161,7 @@ def test_volume_lower_bound_is_tight() -> None:
 
 
 def test_incompatibility_clique_raises_the_lower_bound() -> None:
-    items = [Item(f"i{k}", 6, 6, 6) for k in range(3)]
+    items = [Item(f"i{k}", Shape(6, 6, 6)) for k in range(3)]
     problem = _problem(items)
     assert problem.volume_lower_bound == 1
     assert problem.clique_lower_bound == 3
@@ -174,11 +172,11 @@ def test_incompatibility_clique_raises_the_lower_bound() -> None:
 def test_searches_when_bounds_are_not_tight() -> None:
     bin_capacity = Bin(8, 8, 8)
     items = [
-        Item("i0", 5, 3, 2, RotationType.ALL),
-        Item("i1", 5, 2, 6, RotationType.NONE),
-        Item("i2", 7, 5, 3, RotationType.FIXED_BOTTOM),
-        Item("i3", 4, 7, 5, RotationType.ALL),
-        Item("i4", 3, 7, 7, RotationType.NONE),
+        Item("i0", Shape(5, 3, 2), RotationType.ALL),
+        Item("i1", Shape(5, 2, 6), RotationType.NONE),
+        Item("i2", Shape(7, 5, 3), RotationType.FIXED_BOTTOM),
+        Item("i3", Shape(4, 7, 5), RotationType.ALL),
+        Item("i4", Shape(3, 7, 7), RotationType.NONE),
     ]
     problem = _problem(items, bin_capacity)
     assert problem.lower_bound == 1
@@ -187,7 +185,7 @@ def test_searches_when_bounds_are_not_tight() -> None:
 
 
 def test_bin_indices_are_consecutive_from_zero() -> None:
-    items = [Item(f"i{k}", 6, 6, 6) for k in range(3)]
+    items = [Item(f"i{k}", Shape(6, 6, 6)) for k in range(3)]
     solution = solve(items, BIN, options=FAST)
     assert solution is not None
     used = sorted({placement.bin_index for placement in solution.placements})
@@ -204,7 +202,7 @@ def test_empty_instance_uses_no_bins() -> None:
 def test_deterministic_on_tiny_instance() -> None:
     # One worker: CP-SAT then explores a single deterministic search path.
     options = SolverOptions(time_limit=15.0, num_search_workers=1)
-    items = [Item(f"i{k}", 3, 4, 5, RotationType.ALL) for k in range(6)]
+    items = [Item(f"i{k}", Shape(3, 4, 5), RotationType.ALL) for k in range(6)]
     first = solve(items, BIN, options=options)
     second = solve(items, BIN, options=options)
     assert first is not None and second is not None
@@ -212,7 +210,7 @@ def test_deterministic_on_tiny_instance() -> None:
 
 
 def test_lower_k_is_proven_infeasible() -> None:
-    items = [Item("a", 6, 6, 6), Item("b", 6, 6, 6)]
+    items = [Item("a", Shape(6, 6, 6)), Item("b", Shape(6, 6, 6))]
     solution = solve(items, BIN, options=FAST)
     assert solution is not None
     assert solution.bin_count == 2
@@ -225,7 +223,7 @@ def test_lower_k_is_proven_infeasible() -> None:
 
 
 def test_fixed_k_model_rejects_zero_bins() -> None:
-    items = [Item("a", 4, 4, 4)]
+    items = [Item("a", Shape(4, 4, 4))]
     problem = _problem(items)
     with pytest.raises(ValueError, match="at least 1"):
         build_fixed_k_model(problem, 0, ModelOptions())
@@ -247,10 +245,10 @@ def test_model_options_agree_on_the_optimum(
     orientation_compatibility: bool,
 ) -> None:
     items = [
-        Item("a", 6, 6, 6),
-        Item("b", 6, 6, 6),
-        Item("c", 4, 4, 4),
-        Item("d", 4, 4, 4),
+        Item("a", Shape(6, 6, 6)),
+        Item("b", Shape(6, 6, 6)),
+        Item("c", Shape(4, 4, 4)),
+        Item("d", Shape(4, 4, 4)),
     ]
     options = SolverOptions(
         time_limit=15.0,
@@ -275,7 +273,7 @@ def test_full_reification_adds_exactly_one_constraint_per_separation() -> None:
     must add exactly ``2 * pairs * separable_axes`` constraints. The docstring
     quotes this number as justification for leaving the flag off.
     """
-    items = [Item(f"i{t}", 3 + t, 3, 4, RotationType.ALL) for t in range(4)]
+    items = [Item(f"i{t}", Shape(3 + t, 3, 4), RotationType.ALL) for t in range(4)]
     problem = _problem(items, Bin(10, 10, 10))
 
     def constraint_count(options: ModelOptions) -> int:
@@ -293,7 +291,7 @@ def test_full_reification_adds_exactly_one_constraint_per_separation() -> None:
 
 
 def test_hints_are_optional() -> None:
-    items = [Item(f"i{k}", 5, 5, 5) for k in range(16)]
+    items = [Item(f"i{k}", Shape(5, 5, 5)) for k in range(16)]
     with_hints = solve(items, BIN, options=SolverOptions(time_limit=15.0, use_hints=True))
     without_hints = solve(items, BIN, options=SolverOptions(time_limit=15.0, use_hints=False))
     assert with_hints is not None and without_hints is not None
@@ -306,9 +304,7 @@ def _hard_instance() -> tuple[list[Item], Bin]:
     items = [
         Item(
             id=f"j{t}",
-            width=3 + t % 4,
-            length=2 + t % 3,
-            height=2 + t % 2,
+            shape=Shape(3 + t % 4, 2 + t % 3, 2 + t % 2),
             rotation=RotationType.ALL,
         )
         for t in range(9)
@@ -361,7 +357,7 @@ def test_per_k_limit_does_not_leak_into_the_returned_answer() -> None:
 
 def test_zero_budget_still_reports_the_proven_lower_bound_case() -> None:
     """With no budget at all, an instance that needs one bin is still provable."""
-    solution = solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=0.0))
+    solution = solve([Item("a", Shape(4, 5, 6))], BIN, options=SolverOptions(time_limit=0.0))
     assert solution is None or solution.bin_count == 1
 
 
@@ -372,7 +368,7 @@ def test_status_comparison_uses_value_equality() -> None:
     check against ``cp_model.UNKNOWN`` silently never matches. Guard the shape
     of that contract so it cannot regress.
     """
-    problem = _problem([Item(f"i{k}", 3, 4, 5) for k in range(4)])
+    problem = _problem([Item(f"i{k}", Shape(3, 4, 5)) for k in range(4)])
     fixed = build_fixed_k_model(problem, 1, ModelOptions())
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 0.0
@@ -394,7 +390,7 @@ def test_unknown_fallback_is_verified(monkeypatch: pytest.MonkeyPatch) -> None:
         "validate",
         lambda items, bin_capacity, solution: validation_calls.append(True),
     )
-    solution = solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None))
+    solution = solve([Item("a", Shape(4, 5, 6))], BIN, options=SolverOptions(time_limit=None))
     assert solution is not None
     assert solution.optimal is False
     assert validation_calls == [True]
@@ -418,7 +414,7 @@ def test_infeasible_greedy_upper_bound_is_verified_then_raises(
         lambda items, bin_capacity, solution: validation_calls.append(True),
     )
     with pytest.raises(RuntimeError, match="greedy upper-bound model infeasible"):
-        solve([Item("a", 4, 5, 6)], BIN, options=SolverOptions(time_limit=None))
+        solve([Item("a", Shape(4, 5, 6))], BIN, options=SolverOptions(time_limit=None))
     assert validation_calls == [True]
 
 
@@ -440,9 +436,11 @@ def test_hints_are_never_partial() -> None:
         items = [
             Item(
                 id=f"i{t}",
-                width=rng.randint(1, bin_capacity.width),
-                length=rng.randint(1, bin_capacity.length),
-                height=rng.randint(1, bin_capacity.height),
+                shape=Shape(
+                    rng.randint(1, bin_capacity.width),
+                    rng.randint(1, bin_capacity.length),
+                    rng.randint(1, bin_capacity.height),
+                ),
                 rotation=rng.choice(list(RotationType)),
             )
             for t in range(rng.randint(1, 5))
@@ -501,7 +499,7 @@ def test_zero_and_unbounded_time_limits_are_accepted(
 ) -> None:
     """Zero means 'no budget' and None means 'unbounded'; neither is invalid."""
     options = SolverOptions(time_limit=time_limit, per_k_time_limit=per_k_time_limit)
-    items = [Item(f"i{k}", 2, 2, 2) for k in range(3)]
+    items = [Item(f"i{k}", Shape(2, 2, 2)) for k in range(3)]
     solution = solve(items, Bin(5, 5, 5), options=options)
     assert solution is not None
     validate(items, Bin(5, 5, 5), solution)

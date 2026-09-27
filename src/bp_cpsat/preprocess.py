@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from .models import Bin, Item, Orientation, PackingSolution, Placement
+from .models import Bin, Item, Orientation, PackingSolution, Placement, Shape
 from .orientations import allowed_orientations
 
 
@@ -29,16 +29,9 @@ class PreparedItem:
         return self.item.volume
 
     @property
-    def min_width(self) -> int:
-        return min(orientation.width for orientation in self.orientations)
-
-    @property
-    def min_length(self) -> int:
-        return min(orientation.length for orientation in self.orientations)
-
-    @property
-    def min_height(self) -> int:
-        return min(orientation.height for orientation in self.orientations)
+    def minimum_extent(self) -> Shape:
+        """Smallest per-axis extent over the feasible orientations."""
+        return Shape.componentwise_min(self.orientations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,19 +56,10 @@ def build_pair_compatibility(
 ) -> PairCompatibility:
     """Compute axis separability and orientation-pair compatibility for a pair."""
     allowed = tuple(
-        tuple(
-            first_o.width + second_o.width <= bin_capacity.width
-            or first_o.length + second_o.length <= bin_capacity.length
-            or first_o.height + second_o.height <= bin_capacity.height
-            for second_o in second.orientations
-        )
+        tuple(first_o.fits_beside(second_o, bin_capacity) for second_o in second.orientations)
         for first_o in first.orientations
     )
-    separable = (
-        first.min_width + second.min_width <= bin_capacity.width,
-        first.min_length + second.min_length <= bin_capacity.length,
-        first.min_height + second.min_height <= bin_capacity.height,
-    )
+    separable = first.minimum_extent.separable_within(second.minimum_extent, bin_capacity)
     return PairCompatibility(separable=separable, allowed=allowed)
 
 
@@ -127,8 +111,7 @@ def _greedy_clique(adjacency: tuple[frozenset[int], ...]) -> int:
                 continue
             if all(candidate in adjacency[node] for node in clique):
                 clique.append(candidate)
-        if len(clique) > best:
-            best = len(clique)
+        best = max(best, len(clique))
     return best
 
 

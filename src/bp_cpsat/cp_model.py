@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from ortools.sat.python import cp_model
 
-from .models import PackingSolution, Placement
+from .models import Coordinate, PackingSolution, Placement, Shape
 from .preprocess import PairCompatibility, PreparedProblem
 
 
@@ -67,9 +67,7 @@ class Hint:
 
     bin_index: int
     orientation: int
-    x: int
-    y: int
-    z: int
+    origin: Coordinate
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,9 +94,9 @@ class FixedKModel:
                 continue
             self.model.add_hint(self.bin_vars[index], hint.bin_index)
             self.model.add_hint(self.orientation_vars[index], hint.orientation)
-            self.model.add_hint(self.x_vars[index], hint.x)
-            self.model.add_hint(self.y_vars[index], hint.y)
-            self.model.add_hint(self.z_vars[index], hint.z)
+            self.model.add_hint(self.x_vars[index], hint.origin.x)
+            self.model.add_hint(self.y_vars[index], hint.origin.y)
+            self.model.add_hint(self.z_vars[index], hint.origin.z)
 
     def extract(self, solver: cp_model.CpSolver, problem: PreparedProblem) -> PackingSolution:
         """Read the incumbent out of ``solver`` and turn it into a solution."""
@@ -108,12 +106,16 @@ class FixedKModel:
                 Placement(
                     item_id=prepared.id,
                     bin_index=solver.value(self.bin_vars[index]),
-                    x=solver.value(self.x_vars[index]),
-                    y=solver.value(self.y_vars[index]),
-                    z=solver.value(self.z_vars[index]),
-                    width=solver.value(self.width_vars[index]),
-                    length=solver.value(self.length_vars[index]),
-                    height=solver.value(self.height_vars[index]),
+                    origin=Coordinate(
+                        x=solver.value(self.x_vars[index]),
+                        y=solver.value(self.y_vars[index]),
+                        z=solver.value(self.z_vars[index]),
+                    ),
+                    shape=Shape(
+                        width=solver.value(self.width_vars[index]),
+                        length=solver.value(self.length_vars[index]),
+                        height=solver.value(self.height_vars[index]),
+                    ),
                 )
             )
         used = {placement.bin_index for placement in placements}
@@ -189,25 +191,14 @@ def build_fixed_k_model(problem: PreparedProblem, k: int, options: ModelOptions)
         orientations = prepared.orientations
         bin_var = model.new_int_var(0, max(k - 1, 0), f"bin_{index}")
         orientation_var = model.new_int_var(0, len(orientations) - 1, f"ori_{index}")
-        width_var = model.new_int_var(
-            min(o.width for o in orientations),
-            max(o.width for o in orientations),
-            f"dx_{index}",
-        )
-        length_var = model.new_int_var(
-            min(o.length for o in orientations),
-            max(o.length for o in orientations),
-            f"dy_{index}",
-        )
-        height_var = model.new_int_var(
-            min(o.height for o in orientations),
-            max(o.height for o in orientations),
-            f"dz_{index}",
-        )
-        x_var = model.new_int_var(0, bin_capacity.width - prepared.min_width, f"x_{index}")
-        y_var = model.new_int_var(0, bin_capacity.length - prepared.min_length, f"y_{index}")
-        z_var = model.new_int_var(0, bin_capacity.height - prepared.min_height, f"z_{index}")
-
+        smallest = Shape.componentwise_min(orientations)
+        largest = Shape.componentwise_max(orientations)
+        width_var = model.new_int_var(smallest.width, largest.width, f"dx_{index}")
+        length_var = model.new_int_var(smallest.length, largest.length, f"dy_{index}")
+        height_var = model.new_int_var(smallest.height, largest.height, f"dz_{index}")
+        x_var = model.new_int_var(0, bin_capacity.width - smallest.width, f"x_{index}")
+        y_var = model.new_int_var(0, bin_capacity.length - smallest.length, f"y_{index}")
+        z_var = model.new_int_var(0, bin_capacity.height - smallest.height, f"z_{index}")
         model.add_allowed_assignments(
             [orientation_var, width_var, length_var, height_var],
             [

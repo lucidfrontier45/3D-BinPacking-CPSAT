@@ -8,28 +8,31 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .models import Bin, Item, PackingSolution, RotationType
+from .models import Bin, Item, PackingSolution, RotationType, Shape
 
 
 class ValidationError(ValueError):
     """Raised when a solution violates the problem definition."""
 
 
-def _rotations_allowed(item: Item) -> frozenset[tuple[int, int, int]]:
-    width, length, height = item.width, item.length, item.height
+def _rotations_allowed(item: Item) -> frozenset[Shape]:
+    """Shapes the item may take, derived independently of the model code."""
+    base = item.shape
     if item.rotation is RotationType.NONE:
-        return frozenset({(width, length, height)})
+        return frozenset({base})
     if item.rotation is RotationType.FIXED_BOTTOM:
-        return frozenset({(width, length, height), (length, width, height)})
+        return frozenset({base, Shape(base.length, base.width, base.height)})
+    width, length, height = base.as_tuple()
     return frozenset(
-        {
+        Shape(w, l, h)
+        for w, l, h in (
             (width, length, height),
             (width, height, length),
             (length, width, height),
             (length, height, width),
             (height, width, length),
             (height, length, width),
-        }
+        )
     )
 
 
@@ -56,17 +59,10 @@ def validation_errors(
 
         if placement.bin_index < 0:
             errors.append(f"item {placement.item_id!r} has negative bin index")
-        dims = (placement.width, placement.length, placement.height)
-        if dims not in _rotations_allowed(item):
+        if placement.shape not in _rotations_allowed(item):
+            dims = placement.shape.as_tuple()
             errors.append(f"item {placement.item_id!r} uses disallowed orientation {dims}")
-        if (
-            placement.x < 0
-            or placement.y < 0
-            or placement.z < 0
-            or placement.x_end > bin_capacity.width
-            or placement.y_end > bin_capacity.length
-            or placement.z_end > bin_capacity.height
-        ):
+        if not placement.fits_in(bin_capacity):
             errors.append(f"item {placement.item_id!r} is outside its bin")
 
     missing = [item.id for item in items if item.id not in seen]
@@ -83,17 +79,7 @@ def validation_errors(
 
     for i, first in enumerate(solution.placements):
         for second in solution.placements[i + 1 :]:
-            if first.bin_index != second.bin_index:
-                continue
-            overlap = (
-                first.x < second.x_end
-                and second.x < first.x_end
-                and first.y < second.y_end
-                and second.y < first.y_end
-                and first.z < second.z_end
-                and second.z < first.z_end
-            )
-            if overlap:
+            if first.overlaps(second):
                 errors.append(f"items {first.item_id!r} and {second.item_id!r} overlap")
     return tuple(errors)
 

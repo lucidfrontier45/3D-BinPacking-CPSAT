@@ -10,6 +10,7 @@ from bp_cpsat import (
     Item,
     ModelOptions,
     RotationType,
+    Shape,
     SolverOptions,
     best_greedy_pack,
     build_fixed_k_model,
@@ -30,9 +31,11 @@ def _instance(trial: int) -> tuple[list[Item], Bin]:
     items = [
         Item(
             f"i{k}",
-            rng.randint(1, side),
-            rng.randint(1, side),
-            rng.randint(1, side),
+            Shape(
+                rng.randint(1, side),
+                rng.randint(1, side),
+                rng.randint(1, side),
+            ),
             rng.choice(list(RotationType)),
         )
         for k in range(count)

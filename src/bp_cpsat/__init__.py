@@ -2,7 +2,16 @@
 
 from .cp_model import FixedKModel, Hint, ModelOptions, build_fixed_k_model
 from .heuristic import ItemOrder, best_greedy_pack, greedy_pack
-from .models import Bin, Item, Orientation, PackingSolution, Placement, RotationType
+from .models import (
+    Bin,
+    Coordinate,
+    Item,
+    Orientation,
+    PackingSolution,
+    Placement,
+    RotationType,
+    Shape,
+)
 from .orientations import allowed_orientations, candidate_orientations
 from .preprocess import (
     InfeasibleInstanceError,
@@ -18,6 +27,7 @@ from .version import __version__
 
 __all__ = [
     "Bin",
+    "Coordinate",
     "FixedKModel",
     "Hint",
     "InfeasibleInstanceError",
@@ -31,6 +41,7 @@ __all__ = [
     "PreparedItem",
     "PreparedProblem",
     "RotationType",
+    "Shape",
     "SolverOptions",
     "ValidationError",
     "__version__",

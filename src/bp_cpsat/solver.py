@@ -10,7 +10,7 @@ from ortools.sat.python import cp_model
 
 from .cp_model import Hint, ModelOptions, build_fixed_k_model
 from .heuristic import best_greedy_pack
-from .models import Bin, Item, Orientation, PackingSolution
+from .models import Bin, Item, PackingSolution
 from .preprocess import InfeasibleInstanceError, PreparedProblem, prepare
 from .validate import validate
 
@@ -58,20 +58,22 @@ def build_hints(problem: PreparedProblem) -> tuple[Hint | None, ...]:
             continue
         if placement.bin_index not in labels:
             labels[placement.bin_index] = len(labels)
-        try:
-            orientation = prepared.orientations.index(
-                Orientation(placement.width, placement.length, placement.height)
-            )
-        except ValueError:
+        orientation = next(
+            (
+                index
+                for index, candidate in enumerate(prepared.orientations)
+                if candidate == placement.shape
+            ),
+            None,
+        )
+        if orientation is None:
             hints.append(None)
             continue
         hints.append(
             Hint(
                 bin_index=labels[placement.bin_index],
                 orientation=orientation,
-                x=placement.x,
-                y=placement.y,
-                z=placement.z,
+                origin=placement.origin,
             )
         )
     return tuple(hints)

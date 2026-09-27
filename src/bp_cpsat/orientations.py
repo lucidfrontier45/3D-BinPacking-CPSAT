@@ -16,7 +16,7 @@ _PERMUTATIONS: tuple[tuple[int, int, int], ...] = (
 
 def candidate_orientations(item: Item) -> tuple[Orientation, ...]:
     """Return every orientation allowed by ``item.rotation``, duplicates included."""
-    dims = (item.width, item.length, item.height)
+    dims = item.shape.as_tuple()
     if item.rotation is RotationType.NONE:
         return (Orientation(*dims),)
     if item.rotation is RotationType.FIXED_BOTTOM:
@@ -37,11 +37,7 @@ def allowed_orientations(item: Item, bin_capacity: Bin) -> tuple[Orientation, ..
         key = orientation.as_tuple()
         if key in seen:
             continue
-        if (
-            orientation.width > bin_capacity.width
-            or orientation.length > bin_capacity.length
-            or orientation.height > bin_capacity.height
-        ):
+        if not orientation.fits_in(bin_capacity):
             continue
         seen[key] = None
     return tuple(Orientation(*key) for key in seen)
